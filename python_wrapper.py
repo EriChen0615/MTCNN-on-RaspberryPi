@@ -17,8 +17,8 @@ def main():
     hs = 207
     ws = 270
     im_data = imResample(img, hs, ws)
-    print im_data.shape
-    print im_data[0, 0, :]
+    print(im_data.shape)
+    print(im_data[0, 0, :])
 
 if __name__ == "__main__":
     main()

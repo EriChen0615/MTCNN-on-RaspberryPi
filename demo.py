@@ -13,7 +13,7 @@ def bbreg(boundingbox, reg):
     
     # calibrate bouding boxes
     if reg.shape[1] == 1:
-        print "reshape of reg"
+        print("reshape of reg")
         pass # reshape of reg
     w = boundingbox[:,2] - boundingbox[:,0] + 1
     h = boundingbox[:,3] - boundingbox[:,1] + 1
@@ -219,7 +219,7 @@ _tstart_stack = []
 def tic():
     _tstart_stack.append(time())
 def toc(fmt="Elapsed: %s s"):
-    print fmt % (time()-_tstart_stack.pop())
+    print(fmt % (time()-_tstart_stack.pop()))
 
 
 def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
@@ -288,7 +288,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
     #####
     # 1 #
     #####
-    print "[1]:",total_boxes.shape[0]
+    print("[1]:",total_boxes.shape[0])
     #print total_boxes
     #return total_boxes, [] 
 
@@ -298,7 +298,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         # nms
         pick = nms(total_boxes, 0.7, 'Union')
         total_boxes = total_boxes[pick, :]
-        print "[2]:",total_boxes.shape[0]
+        print("[2]:",total_boxes.shape[0])
         
         # revise and convert to square
         regh = total_boxes[:,3] - total_boxes[:,1]
@@ -316,10 +316,10 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         #print total_boxes
 
         total_boxes = rerec(total_boxes) # convert box to square
-        print "[4]:",total_boxes.shape[0]
+        print("[4]:",total_boxes.shape[0])
         
         total_boxes[:,0:4] = np.fix(total_boxes[:,0:4])
-        print "[4.5]:",total_boxes.shape[0]
+        print("[4.5]:",total_boxes.shape[0])
         #print total_boxes
         [dy, edy, dx, edx, y, ey, x, ex, tmpw, tmph] = pad(total_boxes, w, h)
 
@@ -340,14 +340,14 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         # construct input for RNet
         tempimg = np.zeros((numbox, 24, 24, 3)) # (24, 24, 3, numbox)
         for k in range(numbox):
-            tmp = np.zeros((tmph[k], tmpw[k],3))
+            tmp = np.zeros((int(tmph[k]), int(tmpw[k]),3))
           
             #print "dx[k], edx[k]:", dx[k], edx[k]
             #print "dy[k], edy[k]:", dy[k], edy[k]
             #print "img.shape", img[y[k]:ey[k]+1, x[k]:ex[k]+1].shape
             #print "tmp.shape", tmp[dy[k]:edy[k]+1, dx[k]:edx[k]+1].shape
 
-            tmp[dy[k]:edy[k]+1, dx[k]:edx[k]+1] = img[y[k]:ey[k]+1, x[k]:ex[k]+1]
+            tmp[int(dy[k]):int(edy[k]+1), int(dx[k]):int(edx[k]+1)] = img[int(y[k]):int(ey[k]+1), int(x[k]):int(ex[k]+1)]
             #print "y,ey,x,ex", y[k], ey[k], x[k], ex[k]
             #print "tmp", tmp.shape
             
@@ -384,7 +384,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         
         score =  np.array([score[pass_t]]).T
         total_boxes = np.concatenate( (total_boxes[pass_t, 0:4], score), axis = 1)
-        print "[5]:",total_boxes.shape[0]
+        print("[5]:",total_boxes.shape[0])
         #print total_boxes
 
         #print "1.5:",total_boxes.shape
@@ -396,16 +396,16 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
             #print 'pick', pick
             if len(pick) > 0 :
                 total_boxes = total_boxes[pick, :]
-                print "[6]:",total_boxes.shape[0]
+                print("[6]:",total_boxes.shape[0])
                 total_boxes = bbreg(total_boxes, mv[:, pick])
-                print "[7]:",total_boxes.shape[0]
+                print("[7]:",total_boxes.shape[0])
                 total_boxes = rerec(total_boxes)
-                print "[8]:",total_boxes.shape[0]
+                print("[8]:",total_boxes.shape[0])
             
         #####
         # 2 #
         #####
-        print "2:",total_boxes.shape
+        print("2:",total_boxes.shape)
 
         numbox = total_boxes.shape[0]
         if numbox > 0:
@@ -424,8 +424,8 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
 
             tempimg = np.zeros((numbox, 48, 48, 3))
             for k in range(numbox):
-                tmp = np.zeros((tmph[k], tmpw[k],3))
-                tmp[dy[k]:edy[k]+1, dx[k]:edx[k]+1] = img[y[k]:ey[k]+1, x[k]:ex[k]+1]
+                tmp = np.zeros((int(tmph[k]), int(tmpw[k]),3))
+                tmp[int(dy[k]):int(edy[k]+1), int(dx[k]):int(edx[k]+1)] = img[int(y[k]):int(ey[k]+1), int(x[k]):int(ex[k]+1)]
                 tempimg[k,:,:,:] = cv2.resize(tmp, (48, 48))
             tempimg = (tempimg-127.5)*0.0078125 # [0,255] -> [-1,1]
                 
@@ -441,7 +441,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
             points = points[pass_t, :]
             score = np.array([score[pass_t]]).T
             total_boxes = np.concatenate( (total_boxes[pass_t, 0:4], score), axis=1)
-            print "[9]:",total_boxes.shape[0]
+            print("[9]:",total_boxes.shape[0])
             
             mv = out['conv6-2'][pass_t, :].T
             w = total_boxes[:,3] - total_boxes[:,1] + 1
@@ -452,19 +452,19 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
 
             if total_boxes.shape[0] > 0:
                 total_boxes = bbreg(total_boxes, mv[:,:])
-                print "[10]:",total_boxes.shape[0]
+                print("[10]:",total_boxes.shape[0])
                 pick = nms(total_boxes, 0.7, 'Min')
                 
                 #print pick
                 if len(pick) > 0 :
                     total_boxes = total_boxes[pick, :]
-                    print "[11]:",total_boxes.shape[0]
+                    print("[11]:",total_boxes.shape[0])
                     points = points[pick, :]
 
     #####
     # 3 #
     #####
-    print "3:",total_boxes.shape
+    print("3:",total_boxes.shape)
 
     return total_boxes, points
 
@@ -529,7 +529,7 @@ def main():
     f = open(imglistfile, 'r')
     for imgpath in f.readlines():
         imgpath = imgpath.split('\n')[0]
-        print "######\n", imgpath
+        print("######\n", imgpath)
         img = cv2.imread(imgpath)
         img_matlab = img.copy()
         tmp = img_matlab[:,:,2].copy()
@@ -554,15 +554,15 @@ def main():
             cv2.rectangle(img, (int(boundingboxes[i][1]), int(boundingboxes[i][0])), (int(boundingboxes[i][3]), int(boundingboxes[i][2])), (0,255,0), 1)    
 
         img = drawBoxes(img, boundingboxes)
-        #cv2.imshow('img', img)
-        #ch = cv2.waitKey(0) & 0xFF
-        #if ch == 27:
-        #    break
+        cv2.imshow('img', img)
+        ch = cv2.waitKey(0) & 0xFF
+        if ch == 27:
+            break
 
 
-        #if boundingboxes.shape[0] > 0:
-        #    error.append[imgpath]
-    #print error
+        if boundingboxes.shape[0] > 0:
+            error.append[imgpath]
+    print(error)
     f.close()
 
 if __name__ == "__main__":

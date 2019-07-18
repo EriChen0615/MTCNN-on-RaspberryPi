@@ -5,11 +5,11 @@ import caffe
 import cv2
 import numpy as np
 import base64
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 
 from scipy import misc
 
-import cStringIO
+import io
 from python_wrapper import *
 import os
 
@@ -18,7 +18,7 @@ def bbreg(boundingbox, reg):
     
     # calibrate bouding boxes
     if reg.shape[1] == 1:
-        print "reshape of reg"
+        print("reshape of reg")
         pass # reshape of reg
     w = boundingbox[:,2] - boundingbox[:,0] + 1
     h = boundingbox[:,3] - boundingbox[:,1] + 1
@@ -224,7 +224,7 @@ _tstart_stack = []
 def tic():
     _tstart_stack.append(time())
 def toc(fmt="Elapsed: %s s"):
-    print fmt % (time()-_tstart_stack.pop())
+    print((fmt % (time()-_tstart_stack.pop())))
 
 
 def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
@@ -293,7 +293,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
     #####
     # 1 #
     #####
-    print "[1]:",total_boxes.shape[0]
+    print(("[1]:",total_boxes.shape[0]))
     #print total_boxes
     #return total_boxes, [] 
 
@@ -303,7 +303,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         # nms
         pick = nms(total_boxes, 0.7, 'Union')
         total_boxes = total_boxes[pick, :]
-        print "[2]:",total_boxes.shape[0]
+        print(("[2]:",total_boxes.shape[0]))
         
         # revise and convert to square
         regh = total_boxes[:,3] - total_boxes[:,1]
@@ -321,10 +321,10 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         #print total_boxes
 
         total_boxes = rerec(total_boxes) # convert box to square
-        print "[4]:",total_boxes.shape[0]
+        print(("[4]:",total_boxes.shape[0]))
         
         total_boxes[:,0:4] = np.fix(total_boxes[:,0:4])
-        print "[4.5]:",total_boxes.shape[0]
+        print(("[4.5]:",total_boxes.shape[0]))
         #print total_boxes
         [dy, edy, dx, edx, y, ey, x, ex, tmpw, tmph] = pad(total_boxes, w, h)
 
@@ -389,7 +389,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         
         score =  np.array([score[pass_t]]).T
         total_boxes = np.concatenate( (total_boxes[pass_t, 0:4], score), axis = 1)
-        print "[5]:",total_boxes.shape[0]
+        print(("[5]:",total_boxes.shape[0]))
         #print total_boxes
 
         #print "1.5:",total_boxes.shape
@@ -401,16 +401,16 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
             #print 'pick', pick
             if len(pick) > 0 :
                 total_boxes = total_boxes[pick, :]
-                print "[6]:",total_boxes.shape[0]
+                print(("[6]:",total_boxes.shape[0]))
                 total_boxes = bbreg(total_boxes, mv[:, pick])
-                print "[7]:",total_boxes.shape[0]
+                print(("[7]:",total_boxes.shape[0]))
                 total_boxes = rerec(total_boxes)
-                print "[8]:",total_boxes.shape[0]
+                print(("[8]:",total_boxes.shape[0]))
             
         #####
         # 2 #
         #####
-        print "2:",total_boxes.shape
+        print(("2:",total_boxes.shape))
 
         numbox = total_boxes.shape[0]
         if numbox > 0:
@@ -446,7 +446,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
             points = points[pass_t, :]
             score = np.array([score[pass_t]]).T
             total_boxes = np.concatenate( (total_boxes[pass_t, 0:4], score), axis=1)
-            print "[9]:",total_boxes.shape[0]
+            print(("[9]:",total_boxes.shape[0]))
             
             mv = out['conv6-2'][pass_t, :].T
             w = total_boxes[:,3] - total_boxes[:,1] + 1
@@ -457,19 +457,19 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
 
             if total_boxes.shape[0] > 0:
                 total_boxes = bbreg(total_boxes, mv[:,:])
-                print "[10]:",total_boxes.shape[0]
+                print(("[10]:",total_boxes.shape[0]))
                 pick = nms(total_boxes, 0.7, 'Min')
                 
                 #print pick
                 if len(pick) > 0 :
                     total_boxes = total_boxes[pick, :]
-                    print "[11]:",total_boxes.shape[0]
+                    print(("[11]:",total_boxes.shape[0]))
                     points = points[pick, :]
 
     #####
     # 3 #
     #####
-    print "3:",total_boxes.shape
+    print(("3:",total_boxes.shape))
 
     return total_boxes, points
 
@@ -519,16 +519,16 @@ class ipCamera(object):
         self.password = password
 
     def get_frame(self):
-        p = urllib2.HTTPPasswordMgrWithDefaultRealm()
+        p = urllib.request.HTTPPasswordMgrWithDefaultRealm()
         p.add_password(None, self.url, self.username, self.password)
-        handler = urllib2.HTTPBasicAuthHandler(p)
-        opener = urllib2.build_opener(handler)
-        urllib2.install_opener(opener)
+        handler = urllib.request.HTTPBasicAuthHandler(p)
+        opener = urllib.request.build_opener(handler)
+        urllib.request.install_opener(opener)
         
-        response = urllib2.urlopen(self.url)
-        file = cStringIO.StringIO(response.read())
+        response = urllib.request.urlopen(self.url)
+        file = io.StringIO(response.read())
         image = misc.imread(file)
-        print (image.shape)
+        print((image.shape))
         return image
 
         img_array = np.asarray(bytearray(response.read()), dtype=np.uint8)
@@ -558,7 +558,7 @@ tic()
 boundingboxes, points = detect_face(frame, minsize, PNet, RNet, ONet, threshold, False, factor)
 toc()
 nrof_faces = boundingboxes.shape[0]#number of faces
-print('{} Face Detected'.format(nrof_faces))
+print(('{} Face Detected'.format(nrof_faces)))
 for face_position in boundingboxes:
     face_position=face_position.astype(int)
 
