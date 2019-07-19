@@ -506,56 +506,6 @@ def haveFace(img, facedetector):
     return containFace, boundingboxes
 
 def main():
-    cap = cv2.VideoCapture(0)
-    minsize = 20
-
-    caffe_model_path = "./model"
-
-    threshold = [0.6, 0.7, 0.7]
-    factor = 0.709
-    
-    caffe.set_mode_cpu()
-    PNet = caffe.Net(caffe_model_path+"/det1.prototxt", caffe_model_path+"/det1.caffemodel", caffe.TEST)
-    RNet = caffe.Net(caffe_model_path+"/det2.prototxt", caffe_model_path+"/det2.caffemodel", caffe.TEST)
-    ONet = caffe.Net(caffe_model_path+"/det3.prototxt", caffe_model_path+"/det3.caffemodel", caffe.TEST)
-
-    while True: 
-        #Capture frame-by-frame
-        __, frame = cap.read()
-
-        img = frame
-        img_matlab = img.copy()
-        tmp = img_matlab[:,:,2].copy()
-        img_matlab[:,:,2] = img_matlab[:,:,0]
-        img_matlab[:,:,0] = tmp
-
-        # check rgb position
-        #tic()
-        boundingboxes, points = detect_face(img_matlab, minsize, PNet, RNet, ONet, threshold, False, factor)
-        #toc()
-
-        ## copy img to positive folder
-        #if boundingboxes.shape[0] > 0 :
-        #    import shutil
-        #    shutil.copy(imgpath, '/home/duino/Videos/3/disdata/positive/'+os.path.split(imgpath)[1] )
-        #else:
-        #    import shutil
-        #    shutil.copy(imgpath, '/home/duino/Videos/3/disdata/negetive/'+os.path.split(imgpath)[1] )
-
-
-        for i in range(len(boundingboxes)):
-            cv2.rectangle(img, (int(boundingboxes[i][1]), int(boundingboxes[i][0])), (int(boundingboxes[i][3]), int(boundingboxes[i][2])), (0,255,0), 1)    
-
-        img = drawBoxes(img, boundingboxes)
-        cv2.imshow('img', img)
-
-        if cv2.waitKey(1) &0xFF == ord('q'):
-            break
-    #When everything's done, release capture
-    cap.release()
-    cv2.destroyAllWindows()
-
-def main123():
     #imglistfile = "./file.txt"
     #imglistfile = "/home/duino/project/mtcnn/error.txt"
     #imglistfile = "/home/duino/iactive/mtcnn/all.txt"

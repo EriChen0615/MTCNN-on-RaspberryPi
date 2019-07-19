@@ -12,7 +12,7 @@ def add_path(path):
     if path not in sys.path:
         sys.path.insert(0, path)
 
-caffe_path = '/usr/bin/caffe'
+caffe_path = '/sidelinux/caffe'
 
 # Add caffe to PYTHONPATH
 caffe_path = osp.join(caffe_path, 'python')
