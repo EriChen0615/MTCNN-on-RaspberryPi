@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 from python_wrapper import *
 import os
+from timeit import default_timer as timer
 
 def bbreg(boundingbox, reg):
     reg = reg.T 
@@ -267,16 +268,23 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         im_data = np.array([im_data], dtype = np.float)
         PNet.blobs['data'].reshape(1, 3, ws, hs)
         PNet.blobs['data'].data[...] = im_data
+        
+        t_start = timer()
         out = PNet.forward()
+        t_end = timer()
+        print("Time for PNet.forward {0}".format(t_end-t_start))
     
         boxes = generateBoundingBox(out['prob1'][0,1,:,:], out['conv4-2'][0], scale, threshold[0])
         if boxes.shape[0] != 0:
             #print boxes[4:9]
             #print 'im_data', im_data[0:5, 0:5, 0], '\n'
             #print 'prob1', out['prob1'][0,0,0:3,0:3]
-
+            
+            t_start = timer()
             pick = nms(boxes, 0.5, 'Union')
-
+            t_end = timer()
+            print("Time for NMS {0}".format(t_end-t_start))
+            
             if len(pick) > 0 :
                 boxes = boxes[pick, :]
 
@@ -372,7 +380,11 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         
         RNet.blobs['data'].reshape(numbox, 3, 24, 24)
         RNet.blobs['data'].data[...] = tempimg
+        
+        t_start = timer()
         out = RNet.forward()
+        t_end = timer()
+        print("Time for RNet.forward {0}".format(t_end-t_start))
 
         #print out['conv5-2'].shape
         #print out['prob1'].shape
@@ -433,7 +445,11 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
             tempimg = np.swapaxes(tempimg, 1, 3)
             ONet.blobs['data'].reshape(numbox, 3, 48, 48)
             ONet.blobs['data'].data[...] = tempimg
+            
+            t_start = timer()
             out = ONet.forward()
+            t_end = timer()
+            print("Time for ONet.forward {0}".format(t_end-t_start))
             
             score = out['prob1'][:,1]
             points = out['conv6-3']
@@ -538,7 +554,10 @@ def main():
 
         # check rgb position
         #tic()
+        t_start = timer()
         boundingboxes, points = detect_face(img_matlab, minsize, PNet, RNet, ONet, threshold, False, factor)
+        t_end = timer()
+        print("Total elapsed time {0}".format(t_end-t_start))       
         #toc()
 
         ## copy img to positive folder
@@ -555,14 +574,14 @@ def main():
 
         img = drawBoxes(img, boundingboxes)
         cv2.imshow('img', img)
-        ch = cv2.waitKey(0) & 0xFF
-        if ch == 27:
-            break
+
+        while(cv2.waitKey(0)!=27):
+            pass
 
 
-        if boundingboxes.shape[0] > 0:
-            error.append[imgpath]
-    print(error)
+        #if boundingboxes.shape[0] > 0:
+        #    error.append[imgpath]
+
     f.close()
 
 if __name__ == "__main__":

@@ -1,1 +1,2 @@
 test5.jpg
+test5_bw.jpg
