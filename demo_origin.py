@@ -537,9 +537,9 @@ def main():
         img_matlab[:,:,0] = tmp
 
         # check rgb position
-        #tic()
+        tic()
         boundingboxes, points = detect_face(img_matlab, minsize, PNet, RNet, ONet, threshold, False, factor)
-        #toc()
+        toc()
 
         ## copy img to positive folder
         #if boundingboxes.shape[0] > 0 :
