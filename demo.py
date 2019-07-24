@@ -130,7 +130,7 @@ def nms(boxes, threshold, type):
     s = boxes[:,4]
     area = np.multiply(x2-x1+1, y2-y1+1)
     I = np.array(s.argsort()) # read s using I
-    
+    return [I[-1]]
     pick = [];
     while len(I) > 0:
         xx1 = np.maximum(x1[I[-1]], x1[I[0:-1]])
@@ -147,6 +147,7 @@ def nms(boxes, threshold, type):
         pick.append(I[-1])
         I = I[np.where( o <= threshold)[0]]
     return pick
+
 
 
 def generateBoundingBox(map, reg, scale, t):
@@ -263,7 +264,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
             im_data = (im_data-127.5)*0.0078125 # [0,255] -> [-1,1]
         #im_data = imResample(img, hs, ws); print "scale:", scale
 
-
+        print("The shape of input image is {0}".format(im_data.shape))
         im_data = np.swapaxes(im_data, 0, 2)
         im_data = np.array([im_data], dtype = np.float)
         PNet.blobs['data'].reshape(1, 3, ws, hs)
@@ -278,13 +279,13 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         if boxes.shape[0] != 0:
             #print boxes[4:9]
             #print 'im_data', im_data[0:5, 0:5, 0], '\n'
-            #print 'prob1', out['prob1'][0,0,0:3,0:3]
+            #print( 'prob1', out['prob1'][0,0,0:3,0:3])
             
             t_start = timer()
-            pick = nms(boxes, 0.5, 'Union')
+            pick = nms(boxes, 0.0, 'Union') # was 0.5
             t_end = timer()
             print("Time for NMS {0}".format(t_end-t_start))
-            
+            print("Len of pick after PNet ",len(pick))
             if len(pick) > 0 :
                 boxes = boxes[pick, :]
 
@@ -304,7 +305,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
     numbox = total_boxes.shape[0]
     if numbox > 0:
         # nms
-        pick = nms(total_boxes, 0.7, 'Union')
+        pick = nms(total_boxes, 0.0, 'Union') # was 0.7
         total_boxes = total_boxes[pick, :]
         print("[2]:",total_boxes.shape[0])
         
@@ -390,7 +391,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         #print out['prob1'].shape
 
         score = out['prob1'][:,1]
-        #print 'score', score
+        #print( 'RNet score', score)
         pass_t = np.where(score>threshold[1])[0]
         #print 'pass_t', pass_t
         
@@ -452,6 +453,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
             print("Time for ONet.forward {0}".format(t_end-t_start))
             
             score = out['prob1'][:,1]
+            #print("ONet score:,",score)
             points = out['conv6-3']
             pass_t = np.where(score>threshold[2])[0]
             points = points[pass_t, :]
@@ -469,7 +471,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
             if total_boxes.shape[0] > 0:
                 total_boxes = bbreg(total_boxes, mv[:,:])
                 print("[10]:",total_boxes.shape[0])
-                pick = nms(total_boxes, 0.7, 'Min')
+                pick = nms(total_boxes, 0.0, 'Min') # was 0.7
                 
                 #print pick
                 if len(pick) > 0 :
@@ -491,7 +493,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
 def initFaceDetector():
     minsize = 20
     caffe_model_path = "/home/duino/iactive/mtcnn/model"
-    threshold = [0.6, 0.7, 0.7]
+    threshold = [0.8, 0.9, 0.9] #0.6,0.7,0.7
     factor = 0.709
     caffe.set_mode_cpu()
     PNet = caffe.Net(caffe_model_path+"/det1.prototxt", caffe_model_path+"/det1.caffemodel", caffe.TEST)

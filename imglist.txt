@@ -1,2 +1,3 @@
-test5.jpg
-test5_bw.jpg
+test1.jpg
+test2.jpg
+test4.jpg
