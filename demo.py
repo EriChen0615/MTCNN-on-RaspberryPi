@@ -130,7 +130,7 @@ def nms(boxes, threshold, type):
     s = boxes[:,4]
     area = np.multiply(x2-x1+1, y2-y1+1)
     I = np.array(s.argsort()) # read s using I
-    return [I[-1]]
+    #return [I[-1]]
     pick = [];
     while len(I) > 0:
         xx1 = np.maximum(x1[I[-1]], x1[I[0:-1]])
@@ -282,7 +282,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
             #print( 'prob1', out['prob1'][0,0,0:3,0:3])
             
             t_start = timer()
-            pick = nms(boxes, 0.0, 'Union') # was 0.5
+            pick = nms(boxes, 0.5, 'Union') # was 0.5
             t_end = timer()
             print("Time for NMS {0}".format(t_end-t_start))
             print("Len of pick after PNet ",len(pick))
@@ -305,7 +305,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
     numbox = total_boxes.shape[0]
     if numbox > 0:
         # nms
-        pick = nms(total_boxes, 0.0, 'Union') # was 0.7
+        pick = nms(total_boxes, 0.7, 'Union') # was 0.7
         total_boxes = total_boxes[pick, :]
         print("[2]:",total_boxes.shape[0])
         
@@ -471,7 +471,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
             if total_boxes.shape[0] > 0:
                 total_boxes = bbreg(total_boxes, mv[:,:])
                 print("[10]:",total_boxes.shape[0])
-                pick = nms(total_boxes, 0.0, 'Min') # was 0.7
+                pick = nms(total_boxes, 0.7, 'Min') # was 0.7
                 
                 #print pick
                 if len(pick) > 0 :
@@ -571,9 +571,10 @@ def main():
         #    shutil.copy(imgpath, '/home/duino/Videos/3/disdata/negetive/'+os.path.split(imgpath)[1] )
 
 
-        for i in range(len(boundingboxes)):
-            cv2.rectangle(img, (int(boundingboxes[i][1]), int(boundingboxes[i][0])), (int(boundingboxes[i][3]), int(boundingboxes[i][2])), (0,255,0), 1)    
-
+        #for i in range(len(boundingboxes)):
+            #cv2.rectangle(img, (int(boundingboxes[i][1]), int(boundingboxes[i][0])), (int(boundingboxes[i][3]), int(boundingboxes[i][2])), (0,255,0), 1)    
+        
+        print("Shape of bounding boxes:",boundingboxes.shape)
         img = drawBoxes(img, boundingboxes)
         cv2.imshow('img', img)
 
