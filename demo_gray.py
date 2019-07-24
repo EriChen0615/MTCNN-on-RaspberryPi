@@ -506,15 +506,14 @@ def haveFace(img, facedetector):
     return containFace, boundingboxes
 
 def main():
-    cap = cv2.VideoCapture(0)
+    
     minsize = 20
     
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH,320)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT,240)
+
 
     caffe_model_path = "./model"
 
-    threshold = [0.6, 0.7, 0.7]
+    threshold = [0.7, 0.7, 0.7]
     factor = 0.709
     
     caffe.set_mode_cpu()
@@ -522,11 +521,17 @@ def main():
     RNet = caffe.Net(caffe_model_path+"/det2.prototxt", caffe_model_path+"/det2.caffemodel", caffe.TEST)
     ONet = caffe.Net(caffe_model_path+"/det3.prototxt", caffe_model_path+"/det3.caffemodel", caffe.TEST)
 
-    while True: 
+    cap = cv2.VideoCapture(0)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH,320)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT,240)
+
+    while True:
+
+        tic() 
         #Capture frame-by-frame
         __, frame = cap.read()
         
-        tic()
+
         #img = frame
         img_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         img = cv2.cvtColor(img_gray, cv2.COLOR_GRAY2BGR)
@@ -554,8 +559,8 @@ def main():
         #    shutil.copy(imgpath, '/home/duino/Videos/3/disdata/negetive/'+os.path.split(imgpath)[1] )
 
 
-        for i in range(len(boundingboxes)):
-            cv2.rectangle(img, (int(boundingboxes[i][1]), int(boundingboxes[i][0])), (int(boundingboxes[i][3]), int(boundingboxes[i][2])), (0,255,0), 1)    
+        #for i in range(len(boundingboxes)):
+            #cv2.rectangle(img, (int(boundingboxes[i][1]), int(boundingboxes[i][0])), (int(boundingboxes[i][3]), int(boundingboxes[i][2])), (0,255,0), 1)    
 
         img = drawBoxes(frame, boundingboxes)
         cv2.imshow('img', img)

@@ -7,7 +7,6 @@ import cv2
 import numpy as np
 from python_wrapper import *
 import os
-import time
 
 def bbreg(boundingbox, reg):
     reg = reg.T 
@@ -130,23 +129,7 @@ def nms(boxes, threshold, type):
     s = boxes[:,4]
     area = np.multiply(x2-x1+1, y2-y1+1)
     I = np.array(s.argsort()) # read s using I
-    
-    pick = [];
-    while len(I) > 0:
-        xx1 = np.maximum(x1[I[-1]], x1[I[0:-1]])
-        yy1 = np.maximum(y1[I[-1]], y1[I[0:-1]])
-        xx2 = np.minimum(x2[I[-1]], x2[I[0:-1]])
-        yy2 = np.minimum(y2[I[-1]], y2[I[0:-1]])
-        w = np.maximum(0.0, xx2 - xx1 + 1)
-        h = np.maximum(0.0, yy2 - yy1 + 1)
-        inter = w * h
-        if type == 'Min':
-            o = inter / np.minimum(area[I[-1]], area[I[0:-1]])
-        else:
-            o = inter / (area[I[-1]] + area[I[0:-1]] - inter)
-        pick.append(I[-1])
-        I = I[np.where( o <= threshold)[0]]
-    return pick
+    return I
 
 
 def generateBoundingBox(map, reg, scale, t):
@@ -276,7 +259,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
             #print 'im_data', im_data[0:5, 0:5, 0], '\n'
             #print 'prob1', out['prob1'][0,0,0:3,0:3]
 
-            pick = nms(boxes, 0.5, 'Union')
+            pick = nms(boxes, 0.0, 'Union')
 
             if len(pick) > 0 :
                 boxes = boxes[pick, :]
@@ -289,7 +272,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
     #####
     # 1 #
     #####
-    print("[1]:",total_boxes.shape[0], "Time:", t0 - time.clock())
+    print("Pnet boxes:",total_boxes.shape[0])
     #print total_boxes
     #return total_boxes, [] 
 
@@ -297,9 +280,9 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
     numbox = total_boxes.shape[0]
     if numbox > 0:
         # nms
-        pick = nms(total_boxes, 0.7, 'Union')
+        pick = nms(total_boxes, 0.0, 'Union')
         total_boxes = total_boxes[pick, :]
-        print("[2]:",total_boxes.shape[0], "Time:", t0 - time.clock())
+        #print("[2]:",total_boxes.shape[0])
         
         # revise and convert to square
         regh = total_boxes[:,3] - total_boxes[:,1]
@@ -317,10 +300,10 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         #print total_boxes
 
         total_boxes = rerec(total_boxes) # convert box to square
-        print("[4]:",total_boxes.shape[0], "Time:", t0 - time.clock())
+        #print("[4]:",total_boxes.shape[0])
         
         total_boxes[:,0:4] = np.fix(total_boxes[:,0:4])
-        print("[4.5]:",total_boxes.shape[0], "Time:", t0 - time.clock())
+        #print("[4.5]:",total_boxes.shape[0])
         #print total_boxes
         [dy, edy, dx, edx, y, ey, x, ex, tmpw, tmph] = pad(total_boxes, w, h)
 
@@ -385,7 +368,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         
         score =  np.array([score[pass_t]]).T
         total_boxes = np.concatenate( (total_boxes[pass_t, 0:4], score), axis = 1)
-        print("[5]:",total_boxes.shape[0], "Time:", t0 - time.clock())
+        #print("[5]:",total_boxes.shape[0])
         #print total_boxes
 
         #print "1.5:",total_boxes.shape
@@ -393,20 +376,20 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         mv = out['conv5-2'][pass_t, :].T
         #print "mv", mv
         if total_boxes.shape[0] > 0:
-            pick = nms(total_boxes, 0.7, 'Union')
+            pick = nms(total_boxes, 0.0, 'Union')
             #print 'pick', pick
             if len(pick) > 0 :
                 total_boxes = total_boxes[pick, :]
-                print("[6]:",total_boxes.shape[0], "Time:", t0 - time.clock())
+                #print("[6]:",total_boxes.shape[0])
                 total_boxes = bbreg(total_boxes, mv[:, pick])
-                print("[7]:",total_boxes.shape[0], "Time:", t0 - time.clock())
+                #print("[7]:",total_boxes.shape[0])
                 total_boxes = rerec(total_boxes)
-                print("[8]:",total_boxes.shape[0], "Time:", t0 - time.clock())
+                #print("[8]:",total_boxes.shape[0])
             
         #####
         # 2 #
         #####
-        print("2:",total_boxes.shape, "Time:", t0 - time.clock())
+        #print("2:",total_boxes.shape)
 
         numbox = total_boxes.shape[0]
         if numbox > 0:
@@ -442,7 +425,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
             points = points[pass_t, :]
             score = np.array([score[pass_t]]).T
             total_boxes = np.concatenate( (total_boxes[pass_t, 0:4], score), axis=1)
-            print("[9]:",total_boxes.shape[0], "Time:", t0 - time.clock())
+            #print("[9]:",total_boxes.shape[0])
             
             mv = out['conv6-2'][pass_t, :].T
             w = total_boxes[:,3] - total_boxes[:,1] + 1
@@ -453,19 +436,19 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
 
             if total_boxes.shape[0] > 0:
                 total_boxes = bbreg(total_boxes, mv[:,:])
-                print("[10]:",total_boxes.shape[0], "Time:", t0 - time.clock())
-                pick = nms(total_boxes, 0.7, 'Min')
+                #print("[10]:",total_boxes.shape[0])
+                pick = nms(total_boxes, 0.0, 'Min')
                 
                 #print pick
                 if len(pick) > 0 :
                     total_boxes = total_boxes[pick, :]
-                    print("[11]:",total_boxes.shape[0], "Time:", t0 - time.clock())
+                    #print("[11]:",total_boxes.shape[0])
                     points = points[pick, :]
 
     #####
     # 3 #
     #####
-    print("3:",total_boxes.shape, "Time:", t0 - time.clock())
+    #print("3:",total_boxes.shape)
 
     return total_boxes, points
 
@@ -507,20 +490,14 @@ def haveFace(img, facedetector):
     return containFace, boundingboxes
 
 def main():
-	
-	 t0 = time.clock()
-	 
-    #imglistfile = "./file.txt"
-    #imglistfile = "/home/duino/project/mtcnn/error.txt"
-    #imglistfile = "/home/duino/iactive/mtcnn/all.txt"
-    imglistfile = "./imglist.txt"
-    #imglistfile = "/home/duino/iactive/mtcnn/file_n.txt"
-    #imglistfile = "/home/duino/iactive/mtcnn/file.txt"
+    
     minsize = 20
+    
+
 
     caffe_model_path = "./model"
 
-    threshold = [0.6, 0.7, 0.7]
+    threshold = [0.7, 0.7, 0.7]
     factor = 0.709
     
     caffe.set_mode_cpu()
@@ -528,22 +505,34 @@ def main():
     RNet = caffe.Net(caffe_model_path+"/det2.prototxt", caffe_model_path+"/det2.caffemodel", caffe.TEST)
     ONet = caffe.Net(caffe_model_path+"/det3.prototxt", caffe_model_path+"/det3.caffemodel", caffe.TEST)
 
+    cap = cv2.VideoCapture(0)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH,320)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT,240)
 
-    #error = []
-    f = open(imglistfile, 'r')
-    for imgpath in f.readlines():
-        imgpath = imgpath.split('\n')[0]
-        print("######\n", imgpath)
-        img = cv2.imread(imgpath)
+    while True:
+
+        tic() 
+        #Capture frame-by-frame
+        __, frame = cap.read()
+        
+
+        #img = frame
+        img_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        img = cv2.cvtColor(img_gray, cv2.COLOR_GRAY2BGR)
+
+        #print(frame.shape)
+        #print(img.shape)
+        #cv2.imshow('img', img)
+
         img_matlab = img.copy()
         tmp = img_matlab[:,:,2].copy()
         img_matlab[:,:,2] = img_matlab[:,:,0]
         img_matlab[:,:,0] = tmp
 
         # check rgb position
-        tic()
+        #tic()
         boundingboxes, points = detect_face(img_matlab, minsize, PNet, RNet, ONet, threshold, False, factor)
-        toc()
+        #toc()
 
         ## copy img to positive folder
         #if boundingboxes.shape[0] > 0 :
@@ -557,17 +546,19 @@ def main():
         for i in range(len(boundingboxes)):
             cv2.rectangle(img, (int(boundingboxes[i][1]), int(boundingboxes[i][0])), (int(boundingboxes[i][3]), int(boundingboxes[i][2])), (0,255,0), 1)    
 
-        img = drawBoxes(img, boundingboxes)
+        img = drawBoxes(frame, boundingboxes)
         cv2.imshow('img', img)
-        ch = cv2.waitKey(0) & 0xFF
-        if ch == 27:
+
+        if cv2.waitKey(1) &0xFF == ord('q'):
             break
 
 
-        if boundingboxes.shape[0] > 0:
-            error.append[imgpath]
-    print(error)
-    f.close()
+        toc()
+
+    #When everything's done, release capture
+    cap.release()
+    cv2.destroyAllWindows()
+
 
 if __name__ == "__main__":
     main()
