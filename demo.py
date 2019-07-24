@@ -522,6 +522,8 @@ def main():
     while True: 
         #Capture frame-by-frame
         __, frame = cap.read()
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH,320)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT,240)
 
         img = frame
         img_matlab = img.copy()
@@ -540,11 +542,7 @@ def main():
         #    shutil.copy(imgpath, '/home/duino/Videos/3/disdata/positive/'+os.path.split(imgpath)[1] )
         #else:
         #    import shutil
-        #    shutil.copy(imgpath, '/home/duino/Videos/3/disdata/negetive/'+os.path.split(imgpath)[1] )
-
-
-        for i in range(len(boundingboxes)):
-            cv2.rectangle(img, (int(boundingboxes[i][1]), int(boundingboxes[i][0])), (int(boundingboxes[i][3]), int(boundingboxes[i][2])), (0,255,0), 1)    
+        #    shutil.copy(imgpath, '/home/duino/Videos/3/disdata/negetive/'+os.path.split(imgpath)[1] ) 
 
         img = drawBoxes(img, boundingboxes)
         cv2.imshow('img', img)

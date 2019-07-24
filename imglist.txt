@@ -1,1 +1,1 @@
-test1.jpg
+Image_pyramid/image300.jpg
