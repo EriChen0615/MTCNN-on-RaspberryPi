@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+
 # -*- coding: utf-8 -*-
 
 import _init_paths
@@ -555,65 +555,6 @@ def main():
     cap.release()
     cv2.destroyAllWindows()
 
-def main123():
-    #imglistfile = "./file.txt"
-    #imglistfile = "/home/duino/project/mtcnn/error.txt"
-    #imglistfile = "/home/duino/iactive/mtcnn/all.txt"
-    imglistfile = "./imglist.txt"
-    #imglistfile = "/home/duino/iactive/mtcnn/file_n.txt"
-    #imglistfile = "/home/duino/iactive/mtcnn/file.txt"
-    minsize = 20
-
-    caffe_model_path = "./model"
-
-    threshold = [0.6, 0.7, 0.7]
-    factor = 0.709
-    
-    caffe.set_mode_cpu()
-    PNet = caffe.Net(caffe_model_path+"/det1.prototxt", caffe_model_path+"/det1.caffemodel", caffe.TEST)
-    RNet = caffe.Net(caffe_model_path+"/det2.prototxt", caffe_model_path+"/det2.caffemodel", caffe.TEST)
-    ONet = caffe.Net(caffe_model_path+"/det3.prototxt", caffe_model_path+"/det3.caffemodel", caffe.TEST)
-
-
-    #error = []
-    f = open(imglistfile, 'r')
-    for imgpath in f.readlines():
-        imgpath = imgpath.split('\n')[0]
-        print("######\n", imgpath)
-        img = cv2.imread(imgpath)
-        img_matlab = img.copy()
-        tmp = img_matlab[:,:,2].copy()
-        img_matlab[:,:,2] = img_matlab[:,:,0]
-        img_matlab[:,:,0] = tmp
-
-        # check rgb position
-        #tic()
-        boundingboxes, points = detect_face(img_matlab, minsize, PNet, RNet, ONet, threshold, False, factor)
-        #toc()
-
-        ## copy img to positive folder
-        #if boundingboxes.shape[0] > 0 :
-        #    import shutil
-        #    shutil.copy(imgpath, '/home/duino/Videos/3/disdata/positive/'+os.path.split(imgpath)[1] )
-        #else:
-        #    import shutil
-        #    shutil.copy(imgpath, '/home/duino/Videos/3/disdata/negetive/'+os.path.split(imgpath)[1] )
-
-
-        for i in range(len(boundingboxes)):
-            cv2.rectangle(img, (int(boundingboxes[i][1]), int(boundingboxes[i][0])), (int(boundingboxes[i][3]), int(boundingboxes[i][2])), (0,255,0), 1)    
-
-        img = drawBoxes(img, boundingboxes)
-        cv2.imshow('img', img)
-        ch = cv2.waitKey(0) & 0xFF
-        if ch == 27:
-            break
-
-
-        if boundingboxes.shape[0] > 0:
-            error.append[imgpath]
-    print(error)
-    f.close()
 
 if __name__ == "__main__":
     main()
