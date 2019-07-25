@@ -604,7 +604,7 @@ def main():
 
     caffe_model_path = "./model"
 
-    threshold = [0.6, 0.7, 0.7]                         #initial threshold: 0.6 0.7 0.7
+    threshold = [0.9, 0.8, 0.7]                         #initial threshold: 0.6 0.7 0.7
     factor = 0.709
     
     caffe.set_mode_cpu()                            #comment the next few lines?
@@ -620,13 +620,13 @@ def main():
                             
         # convert the frame to gray scale and restore the BGR info
 
-        grayFrame = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
-        restore = cv2.cvtColor(grayFrame,cv2.COLOR_GRAY2BGR)
+        #grayFrame = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
+        #restore = cv2.cvtColor(grayFrame,cv2.COLOR_GRAY2BGR)
         
         
 
-        img = restore
-        #img = frame
+        #img = restore
+        img = frame
         img_matlab = img.copy()
         tmp = img_matlab[:,:,2].copy()
         img_matlab[:,:,2] = img_matlab[:,:,0]
