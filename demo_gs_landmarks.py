@@ -532,6 +532,10 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
     #print("3:",total_boxes.shape)
     print("Onet time:")
     toc()
+    for i in points:
+        print(i)
+        print(i[0])
+    print("points:",points)
     return total_boxes, points
 
 
@@ -644,6 +648,10 @@ def main():
 
         
         img = drawBoxes(frame, boundingboxes)
+        for i in points:
+            for j in range(5):
+                cv2.circle(img, (i[j], i[j+5]), 1, (0, 255, 0),-1)
+
         cv2.imshow('cam', img)
         
         if cv2.waitKey(1) &0xFF == ord('q'):

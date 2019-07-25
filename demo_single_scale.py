@@ -614,15 +614,15 @@ def main():
         frame = vs.read()
         #frame = imutils.resize(frame, width=400) #do we need to do the resize?
                             
-        # convert the frame to gray scale and restore the BGR info
+# convert the frame to gray scale and restore the BGR info
 
-        grayFrame = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
-        restore = cv2.cvtColor(grayFrame,cv2.COLOR_GRAY2BGR)
+        #grayFrame = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
+        #restore = cv2.cvtColor(grayFrame,cv2.COLOR_GRAY2BGR)
         
         
 
-        img = restore
-        #img = frame
+        #img = restore
+        img = frame
         img_matlab = img.copy()
         tmp = img_matlab[:,:,2].copy()
         img_matlab[:,:,2] = img_matlab[:,:,0]
