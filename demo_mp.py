@@ -1,4 +1,4 @@
-
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 import _init_paths
@@ -7,7 +7,9 @@ import cv2
 import numpy as np
 from python_wrapper import *
 import os
+from multiprocessing import Process, Queue
 from timeit import default_timer as timer
+from time import sleep
 
 def bbreg(boundingbox, reg):
     reg = reg.T 
@@ -207,6 +209,9 @@ def generateBoundingBox(map, reg, scale, t):
 
 
 def drawBoxes(im, boxes):
+    if boxes.shape[0]==0 or boxes.shape[1]==0:
+        return im
+        
     x1 = boxes[:,0]
     y1 = boxes[:,1]
     x2 = boxes[:,2]
@@ -251,6 +256,10 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         factor_count += 1
     
     # first stage
+    scales = [0.128, 0.08, 0.148, 0.4, 0.1]
+    tic()
+    
+
     for scale in scales:
         hs = int(np.ceil(h*scale))
         ws = int(np.ceil(w*scale))
@@ -268,23 +277,16 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         im_data = np.array([im_data], dtype = np.float)
         PNet.blobs['data'].reshape(1, 3, ws, hs)
         PNet.blobs['data'].data[...] = im_data
-        
-        t_start = timer()
         out = PNet.forward()
-        t_end = timer()
-        print("Time for PNet.forward {0}".format(t_end-t_start))
     
         boxes = generateBoundingBox(out['prob1'][0,1,:,:], out['conv4-2'][0], scale, threshold[0])
         if boxes.shape[0] != 0:
             #print boxes[4:9]
             #print 'im_data', im_data[0:5, 0:5, 0], '\n'
             #print 'prob1', out['prob1'][0,0,0:3,0:3]
-            
-            t_start = timer()
+
             pick = nms(boxes, 0.5, 'Union')
-            t_end = timer()
-            print("Time for NMS {0}".format(t_end-t_start))
-            
+
             if len(pick) > 0 :
                 boxes = boxes[pick, :]
 
@@ -296,17 +298,22 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
     #####
     # 1 #
     #####
-    print("[1]:",total_boxes.shape[0])
+    print("Pnet boxes:",total_boxes.shape[0])
+    print("Pnet time:")
+    toc()
+
     #print total_boxes
     #return total_boxes, [] 
 
+    
+    tic()
 
     numbox = total_boxes.shape[0]
     if numbox > 0:
         # nms
         pick = nms(total_boxes, 0.7, 'Union')
         total_boxes = total_boxes[pick, :]
-        print("[2]:",total_boxes.shape[0])
+        #print("[2]:",total_boxes.shape[0])
         
         # revise and convert to square
         regh = total_boxes[:,3] - total_boxes[:,1]
@@ -324,10 +331,10 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         #print total_boxes
 
         total_boxes = rerec(total_boxes) # convert box to square
-        print("[4]:",total_boxes.shape[0])
+        #print("[4]:",total_boxes.shape[0])
         
         total_boxes[:,0:4] = np.fix(total_boxes[:,0:4])
-        print("[4.5]:",total_boxes.shape[0])
+        #print("[4.5]:",total_boxes.shape[0])
         #print total_boxes
         [dy, edy, dx, edx, y, ey, x, ex, tmpw, tmph] = pad(total_boxes, w, h)
 
@@ -380,11 +387,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         
         RNet.blobs['data'].reshape(numbox, 3, 24, 24)
         RNet.blobs['data'].data[...] = tempimg
-        
-        t_start = timer()
         out = RNet.forward()
-        t_end = timer()
-        print("Time for RNet.forward {0}".format(t_end-t_start))
 
         #print out['conv5-2'].shape
         #print out['prob1'].shape
@@ -396,7 +399,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         
         score =  np.array([score[pass_t]]).T
         total_boxes = np.concatenate( (total_boxes[pass_t, 0:4], score), axis = 1)
-        print("[5]:",total_boxes.shape[0])
+        #print("[5]:",total_boxes.shape[0])
         #print total_boxes
 
         #print "1.5:",total_boxes.shape
@@ -408,17 +411,20 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
             #print 'pick', pick
             if len(pick) > 0 :
                 total_boxes = total_boxes[pick, :]
-                print("[6]:",total_boxes.shape[0])
+                #print("[6]:",total_boxes.shape[0])
                 total_boxes = bbreg(total_boxes, mv[:, pick])
-                print("[7]:",total_boxes.shape[0])
+                #print("[7]:",total_boxes.shape[0])
                 total_boxes = rerec(total_boxes)
-                print("[8]:",total_boxes.shape[0])
-            
+                #print("[8]:",total_boxes.shape[0])
+        print("Rnet time:")
+        toc()
+      
         #####
         # 2 #
         #####
-        print("2:",total_boxes.shape)
+        #print("2:",total_boxes.shape)
 
+        tic()
         numbox = total_boxes.shape[0]
         if numbox > 0:
             # third stage
@@ -445,11 +451,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
             tempimg = np.swapaxes(tempimg, 1, 3)
             ONet.blobs['data'].reshape(numbox, 3, 48, 48)
             ONet.blobs['data'].data[...] = tempimg
-            
-            t_start = timer()
             out = ONet.forward()
-            t_end = timer()
-            print("Time for ONet.forward {0}".format(t_end-t_start))
             
             score = out['prob1'][:,1]
             points = out['conv6-3']
@@ -457,7 +459,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
             points = points[pass_t, :]
             score = np.array([score[pass_t]]).T
             total_boxes = np.concatenate( (total_boxes[pass_t, 0:4], score), axis=1)
-            print("[9]:",total_boxes.shape[0])
+            #print("[9]:",total_boxes.shape[0])
             
             mv = out['conv6-2'][pass_t, :].T
             w = total_boxes[:,3] - total_boxes[:,1] + 1
@@ -468,20 +470,21 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
 
             if total_boxes.shape[0] > 0:
                 total_boxes = bbreg(total_boxes, mv[:,:])
-                print("[10]:",total_boxes.shape[0])
+                #print("[10]:",total_boxes.shape[0])
                 pick = nms(total_boxes, 0.7, 'Min')
                 
                 #print pick
                 if len(pick) > 0 :
                     total_boxes = total_boxes[pick, :]
-                    print("[11]:",total_boxes.shape[0])
+                    #print("[11]:",total_boxes.shape[0])
                     points = points[pick, :]
 
     #####
     # 3 #
     #####
-    print("3:",total_boxes.shape)
-
+    #print("3:",total_boxes.shape)
+    print("Onet time:")
+    toc()
     return total_boxes, points
 
 
@@ -521,27 +524,39 @@ def haveFace(img, facedetector):
     containFace = (True, False)[boundingboxes.shape[0]==0]
     return containFace, boundingboxes
 
-def main():
-    cap = cv2.VideoCapture(0)
+def start_process(p_list):
+    for i in range(len(p_list)):
+        p_list[i].start()
+
+def join_process(p_list):
+    for i in range(len(p_list)):
+        p_list[i].join()
+
+def detect_process(qin,qout):
     minsize = 20
 
     caffe_model_path = "./model"
 
     threshold = [0.6, 0.7, 0.7]
-    factor = 0.709
-    
+    factor = 0.08
+
     caffe.set_mode_cpu()
     PNet = caffe.Net(caffe_model_path+"/det1.prototxt", caffe_model_path+"/det1.caffemodel", caffe.TEST)
     RNet = caffe.Net(caffe_model_path+"/det2.prototxt", caffe_model_path+"/det2.caffemodel", caffe.TEST)
     ONet = caffe.Net(caffe_model_path+"/det3.prototxt", caffe_model_path+"/det3.caffemodel", caffe.TEST)
 
-    while True: 
-        #Capture frame-by-frame
-        __, frame = cap.read()
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH,320)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT,240)
+    qout.put(('Initialized',None,None)) # signal main process that initialization has completed
 
-        img = frame
+    while True:
+        if qin.empty():
+            continue
+
+        frame, time_stamp = qin.get()
+        if time_stamp == 'Exit': break # When Exit is put into queue, the process should terminate
+
+        img_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        img = cv2.cvtColor(img_gray, cv2.COLOR_GRAY2BGR)
+
         img_matlab = img.copy()
         tmp = img_matlab[:,:,2].copy()
         img_matlab[:,:,2] = img_matlab[:,:,0]
@@ -549,30 +564,79 @@ def main():
 
         # check rgb position
         #tic()
-        t_start = timer()
         boundingboxes, points = detect_face(img_matlab, minsize, PNet, RNet, ONet, threshold, False, factor)
-        t_end = timer()
-        print("Shape of boundingboxes: ",boundingboxes.shape)
-        print("Total elapsed time {0}".format(t_end-t_start))       
+        qout.put((boundingboxes,points,time_stamp))
         #toc()
 
-        ## copy img to positive folder
-        #if boundingboxes.shape[0] > 0 :
-        #    import shutil
-        #    shutil.copy(imgpath, '/home/duino/Videos/3/disdata/positive/'+os.path.split(imgpath)[1] )
-        #else:
-        #    import shutil
-        #    shutil.copy(imgpath, '/home/duino/Videos/3/disdata/negetive/'+os.path.split(imgpath)[1] ) 
 
-        img = drawBoxes(img, boundingboxes)
+def main():
+
+    process_num = 3 # define the number of processes running detection task
+
+    cap = cv2.VideoCapture(0)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH,320)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT,240)
+
+    boundingboxes = np.ndarray((0,9))
+    points = []
+
+
+    input_queue = Queue(5)
+    output_queue = Queue()
+
+    detect_p_list = []
+    for i in range(process_num):
+        detect_p_list.append(Process(target=detect_process,args=(input_queue,output_queue)))
+        detect_p_list[i].daemon = True
+
+    start_process(detect_p_list)
+
+    # wait for detection process's initialization
+    i = process_num
+    while i != 0:
+        if output_queue.get()[0] == 'Initialized': i -= 1
+
+    last_time = timer()
+    while True:
+        
+        print('--------------------------------------')
+        #Capture frame-by-frame
+        __, frame = cap.read()
+        current_time = timer()
+        sleep(0.01)# small delay to prevent overload
+        input_queue.put((frame,current_time))
+
+        
+        if not output_queue.empty():
+            _boundingboxes, _points, ts = output_queue.get()
+            if ts - last_time > 0:
+                print("Detection FPS = {0}".format(1.0/(ts-last_time)))
+                boundingboxes = _boundingboxes
+                points = _points
+                last_time = ts
+        
+        
+        print(boundingboxes)
+        print(points)
+        print(last_time)
+        print("shape of boundingboxes:",boundingboxes.shape)
+        print("input_queue size:",input_queue.qsize())
+        print("output_queue size:",output_queue.qsize())
+        img = drawBoxes(frame, boundingboxes)
         cv2.imshow('img', img)
+        print("Display FPS = {0}".format(1.0/(timer()-current_time)))
 
-        while(cv2.waitKey(0)!=27):
-            pass
+        if cv2.waitKey(1) &0xFF == ord('q'):
+            break
 
+    #Terminate subprocesses
+    for i in range(process_num):
+        input_queue.put((None,'Exit',None))
+    join_process(detect_p_list)
 
-        #if boundingboxes.shape[0] > 0:
-        #    error.append[imgpath]
+    #When everything's done, release capture
+    cap.release()
+    cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
