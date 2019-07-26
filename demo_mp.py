@@ -571,7 +571,7 @@ def detect_process(qin,qout):
 
 def main():
 
-    process_num = 1 # define the number of processes running detection task
+    process_num = 3 # define the number of processes running detection task
 
     cap = cv2.VideoCapture(0)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH,320)
@@ -581,7 +581,7 @@ def main():
     points = []
 
 
-    input_queue = Queue()
+    input_queue = Queue(5)
     output_queue = Queue()
 
     detect_p_list = []
@@ -603,7 +603,7 @@ def main():
         #Capture frame-by-frame
         __, frame = cap.read()
         current_time = timer()
-        sleep(0.025)# small delay to prevent overload
+        sleep(0.01)# small delay to prevent overload
         input_queue.put((frame,current_time))
 
         

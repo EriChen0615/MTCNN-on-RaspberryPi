@@ -10,7 +10,7 @@ def f(qin,qout,num):
         t_s = timer()
         img = qin.get()
         if img is not None:
-            #img = img*0.9
+            img = img*0.9
             #time.sleep(0.1)
             counter += 1
             bbox = np.random.rand(1,9)
