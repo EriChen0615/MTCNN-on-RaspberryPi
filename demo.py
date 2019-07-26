@@ -552,6 +552,7 @@ def main():
         t_start = timer()
         boundingboxes, points = detect_face(img_matlab, minsize, PNet, RNet, ONet, threshold, False, factor)
         t_end = timer()
+        print("Shape of boundingboxes: ",boundingboxes.shape)
         print("Total elapsed time {0}".format(t_end-t_start))       
         #toc()
 

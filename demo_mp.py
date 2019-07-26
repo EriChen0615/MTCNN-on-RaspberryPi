@@ -9,6 +9,7 @@ from python_wrapper import *
 import os
 from multiprocessing import Process, Queue
 from timeit import default_timer as timer
+from time import sleep
 
 def bbreg(boundingbox, reg):
     reg = reg.T 
@@ -208,6 +209,9 @@ def generateBoundingBox(map, reg, scale, t):
 
 
 def drawBoxes(im, boxes):
+    if boxes.shape[0]==0 or boxes.shape[1]==0:
+        return im
+        
     x1 = boxes[:,0]
     y1 = boxes[:,1]
     x2 = boxes[:,2]
@@ -548,7 +552,7 @@ def detect_process(qin,qout):
             continue
 
         frame, time_stamp = qin.get()
-        if frame == 'Exit': break # When Exit is put into queue, the process should terminate
+        if time_stamp == 'Exit': break # When Exit is put into queue, the process should terminate
 
         img_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         img = cv2.cvtColor(img_gray, cv2.COLOR_GRAY2BGR)
@@ -573,7 +577,9 @@ def main():
     cap.set(cv2.CAP_PROP_FRAME_WIDTH,320)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT,240)
 
-    boundingboxes = np.array((0,9))
+    boundingboxes = np.ndarray((0,9))
+    points = []
+
 
     input_queue = Queue()
     output_queue = Queue()
@@ -597,9 +603,10 @@ def main():
         #Capture frame-by-frame
         __, frame = cap.read()
         current_time = timer()
+        sleep(0.025)# small delay to prevent overload
         input_queue.put((frame,current_time))
 
-
+        
         if not output_queue.empty():
             _boundingboxes, _points, ts = output_queue.get()
             if ts - last_time > 0:
@@ -607,7 +614,14 @@ def main():
                 boundingboxes = _boundingboxes
                 points = _points
                 last_time = ts
-
+        
+        
+        print(boundingboxes)
+        print(points)
+        print(last_time)
+        print("shape of boundingboxes:",boundingboxes.shape)
+        print("input_queue size:",input_queue.qsize())
+        print("output_queue size:",output_queue.qsize())
         img = drawBoxes(frame, boundingboxes)
         cv2.imshow('img', img)
         print("Display FPS = {0}".format(1.0/(timer()-current_time)))
@@ -617,7 +631,7 @@ def main():
 
     #Terminate subprocesses
     for i in range(process_num):
-        input_queue.put(('Exit',None,None))
+        input_queue.put((None,'Exit',None))
     join_process(detect_p_list)
 
     #When everything's done, release capture
