@@ -7,6 +7,58 @@ import cv2
 import numpy as np
 from python_wrapper import *
 import os
+from timeit import default_timer as timer
+from picamera.array import PiRGBArray
+from picamera import PiCamera
+from threading import Thread
+import imutils
+from imutils.video import FPS
+
+
+
+
+
+
+class PiVideoStream:
+
+    def __init__(self,resolution=(352,240),framerate=32):
+    #initialize the camera and the stream
+        self.camera = PiCamera()
+        self.camera.resolution =resolution
+        self.camera.framerate = framerate
+        self.rawCapture = PiRGBArray(self.camera, size=resolution)
+        self.stream = self.camera.capture_continuous(self.rawCapture, format="bgr", use_video_port = True)
+
+    #initialize the frame and teh variable used to indicate if the thread should be stopped
+        self.frame = None
+        self.stopped = False
+    
+    def start(self):
+    #start the thread to read frames from the video stream
+        Thread(target=self.update,args=()).start()
+        return self
+
+    def update(self):
+    #keep looping infinitely until the thread is stopped
+        for f in self.stream:
+        #grab the fram from the stream and clear the stream in preparation for the next frame 
+            self.frame = f.array
+            self.rawCapture.truncate(0)
+        
+        #if the thread indicator variable is set, stop the thread and camera resources
+            if self.stopped:
+                self.stream.close()
+                self.rawCapture.close()
+                self.camera.close()
+                return
+   
+    def read(self):
+    #return the frame most recently read
+        return self.frame
+
+    def stop(self):
+    #indicate that the thread should be stopped
+        self.stopped = True
 
 def bbreg(boundingbox, reg):
     reg = reg.T 
@@ -214,12 +266,12 @@ def drawBoxes(im, boxes):
         cv2.rectangle(im, (int(x1[i]), int(y1[i])), (int(x2[i]), int(y2[i])), (0,255,0), 1)
     return im
 
-from time import time
+import time
 _tstart_stack = []
 def tic():
-    _tstart_stack.append(time())
+    _tstart_stack.append(time.time())
 def toc(fmt="Elapsed: %s s"):
-    print(fmt % (time()-_tstart_stack.pop()))
+    print(fmt % (time.time()-_tstart_stack.pop()))
 
 
 def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
@@ -249,8 +301,9 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         minl *= factor
         factor_count += 1
     
+
     # first stage
-    scales = [0.128, 0.08, 0.148, 0.4, 0.1]
+    scales = [0.128, 0.08, 0.148, 0.1]
     tic()
     
 
@@ -518,42 +571,58 @@ def haveFace(img, facedetector):
     containFace = (True, False)[boundingboxes.shape[0]==0]
     return containFace, boundingboxes
 
+
 def main():
     
-    minsize = 20
+
+    # set the filter of the video -- VSCO! still not working maybe later
+
+    # here to try the method to moving the I/O blocking operations
+    # to a separate thread and maitaining a queue of decoded frames
+    # in an effort to improve FPS
+    # .read() method is a blocking I/O operation
+
+    camera = PiCamera()
+    camera.resolution = (352, 240)
+    camera.framerate = 32
+    rawCapture = PiRGBArray(camera, size=(352, 240))
+    stream = camera.capture_continuous(rawCapture, format="bgr", use_video_port=True)
+    camera.close()
+
+
+    vs = PiVideoStream().start()
+    time.sleep(2.0)
+    fps = FPS().start()
     
 
+
+    minsize = 20
 
     caffe_model_path = "./model"
 
-    threshold = [0.6, 0.7, 0.7]
-    factor = 0.08
+    threshold = [0.6, 0.7, 0.7]                         #initial threshold: 0.6 0.7 0.7
+    factor = 0.709
     
-    caffe.set_mode_cpu()
+    caffe.set_mode_cpu()                            #comment the next few lines?
     PNet = caffe.Net(caffe_model_path+"/det1.prototxt", caffe_model_path+"/det1.caffemodel", caffe.TEST)
     RNet = caffe.Net(caffe_model_path+"/det2.prototxt", caffe_model_path+"/det2.caffemodel", caffe.TEST)
     ONet = caffe.Net(caffe_model_path+"/det3.prototxt", caffe_model_path+"/det3.caffemodel", caffe.TEST)
 
-    cap = cv2.VideoCapture(0)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH,320)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT,240)
+    while True: 
+        start = timer()
+        print("---------------------------------------------")
+        frame = vs.read()
+        #frame = imutils.resize(frame, width=400) #do we need to do the resize?
+                            
+        # convert the frame to gray scale and restore the BGR info
 
-    while True:
+        grayFrame = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
+        restore = cv2.cvtColor(grayFrame,cv2.COLOR_GRAY2BGR)
         
-        print('--------------------------------------')
-        tic() 
-        #Capture frame-by-frame
-        __, frame = cap.read()
         
 
+        img = restore
         #img = frame
-        img_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        img = cv2.cvtColor(img_gray, cv2.COLOR_GRAY2BGR)
-
-        #print(frame.shape)
-        #print(img.shape)
-        #cv2.imshow('img', img)
-
         img_matlab = img.copy()
         tmp = img_matlab[:,:,2].copy()
         img_matlab[:,:,2] = img_matlab[:,:,0]
@@ -573,21 +642,25 @@ def main():
         #    shutil.copy(imgpath, '/home/duino/Videos/3/disdata/negetive/'+os.path.split(imgpath)[1] )
 
 
-        #for i in range(len(boundingboxes)):
-            #cv2.rectangle(img, (int(boundingboxes[i][1]), int(boundingboxes[i][0])), (int(boundingboxes[i][3]), int(boundingboxes[i][2])), (0,255,0), 1)    
-
+        
         img = drawBoxes(frame, boundingboxes)
-        cv2.imshow('img', img)
-
+        cv2.imshow('cam', img)
+        
         if cv2.waitKey(1) &0xFF == ord('q'):
             break
+            
+        
+        end = timer()
+        print ("Total time:",end-start)
 
-
-        toc()
+        fps.update()
 
     #When everything's done, release capture
-    cap.release()
+    #cap.release()
     cv2.destroyAllWindows()
+    vs.stop()
+    vs.update()
+    
 
 
 if __name__ == "__main__":
