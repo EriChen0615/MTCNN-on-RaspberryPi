@@ -551,10 +551,11 @@ def detect_process(qin,qout):
         if qin.empty():
             continue
 
-        frame_gray, time_stamp = qin.get()
+        frame, time_stamp = qin.get()
         if time_stamp == 'Exit': break # When Exit is put into queue, the process should terminate
 
-        img = cv2.cvtColor(frame_gray, cv2.COLOR_GRAY2BGR)
+        img_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        img = cv2.cvtColor(img_gray, cv2.COLOR_GRAY2BGR)
 
         img_matlab = img.copy()
         tmp = img_matlab[:,:,2].copy()
@@ -567,6 +568,23 @@ def detect_process(qin,qout):
         qout.put((boundingboxes,points,time_stamp))
         #toc()
 
+def background_filter(img,last_img):
+    if last_img is None or img is None:
+        return img
+    
+    f_img = (img-last_img) % 240
+    
+    #for column in range(f_img.shape[0]):
+    #   for row in range(f_img.shape[1]):
+    #        px = f_img[column,row]
+                    
+                    
+    return f_img
+
+def _filtered(px):
+    for c in px:
+        if c < 10: return True
+    return False
 
 def main():
 
@@ -575,6 +593,8 @@ def main():
     cap = cv2.VideoCapture(0)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH,320)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT,240)
+    
+    fgbg = cv2.createBackgroundSubtractorMOG2()
 
     boundingboxes = np.ndarray((0,9))
     points = []
@@ -583,56 +603,68 @@ def main():
     input_queue = Queue(5)
     output_queue = Queue()
 
-    detect_p_list = []
-    for i in range(process_num):
-        detect_p_list.append(Process(target=detect_process,args=(input_queue,output_queue)))
-        detect_p_list[i].daemon = True
+    #detect_p_list = []
+    #for i in range(process_num):
+    #   detect_p_list.append(Process(target=detect_process,args=(input_queue,output_queue)))
+    #    detect_p_list[i].daemon = True
 
-    start_process(detect_p_list)
+    #start_process(detect_p_list)
 
     # wait for detection process's initialization
-    i = process_num
-    while i != 0:
-        if output_queue.get()[0] == 'Initialized': i -= 1
-
+    #i = process_num
+    #while i != 0:
+        #if output_queue.get()[0] == 'Initialized': i -= 1
+    last_frame = None
+    f_img = None
     last_time = timer()
     while True:
         
         print('--------------------------------------')
         #Capture frame-by-frame
         __, frame = cap.read()
-        img_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         current_time = timer()
+        
+        f_img = fgbg.apply(frame)
+
+        #f_img = background_filter(frame,last_frame)
+            
         #sleep(0.01)# small delay to prevent overload
-        input_queue.put((img_gray,current_time))
+        #input_queue.put((frame,current_time))
 
         
-        if not output_queue.empty():
-            _boundingboxes, _points, ts = output_queue.get()
-            if ts - last_time > 0:
-                print("Detection FPS = {0}".format(1.0/(ts-last_time)))
-                boundingboxes = _boundingboxes
-                points = _points
-                last_time = ts
+        #if not output_queue.empty():
+        #   _boundingboxes, _points, ts = output_queue.get()
+        #    if ts - last_time > 0:
+        #        print("Detection FPS = {0}".format(1.0/(ts-last_time)))
+        #        boundingboxes = _boundingboxes
+        #        points = _points
+        #        last_time = ts
         
         
-        print(boundingboxes)
-        print(points)
-        print(last_time)
-        print("shape of boundingboxes:",boundingboxes.shape)
-        print("input_queue size:",input_queue.qsize())
-        print("output_queue size:",output_queue.qsize())
-        img = drawBoxes(frame, boundingboxes)
+        #print(boundingboxes)
+        #print(points)
+        #print(last_time)
+        #print("shape of boundingboxes:",boundingboxes.shape)
+        #print("input_queue size:",input_queue.qsize())
+        #print("output_queue size:",output_queue.qsize())
+        img = drawBoxes(frame, np.ndarray((0,9)))
         cv2.imshow('img', img)
+        if not f_img is None:
+            cv2.imshow('filtered',f_img)
         print("Display FPS = {0}".format(1.0/(timer()-current_time)))
-
+        
+        last_frame = frame.copy()
+        
+        while cv2.waitKey(1)&0xFF != ord('n'):
+            pass
+            
         if cv2.waitKey(1) &0xFF == ord('q'):
             break
 
     #Terminate subprocesses
-    for i in range(process_num):
-        input_queue.put((None,'Exit',None))
-    join_process(detect_p_list)
+    #for i in range(process_num):
+    #    input_queue.put((None,'Exit',None))
+    #join_process(detect_p_list)
 
     #When everything's done, release capture
     cap.release()
