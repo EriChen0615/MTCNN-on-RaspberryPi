@@ -234,13 +234,13 @@ def gen_crop_img(frame,bboxes):
     :param bboxes: last bounding box
     :return: a list of (original,(0,0)) + (cropped, (x1,y1,w,h))
     """
-    img_list = [frame]
+    img_list = []
     for bbox in bboxes:
-        x1 = bbox[0]
-        y1 = bbox[1]
-        x2 = bbox[2]
-        y2 = bbox[3]
-        img_list.append(frame[x1:x2+1][y1:y2+1])
+        x1 = int(bbox[0])
+        y1 = int(bbox[1])
+        x2 = int(bbox[2])
+        y2 = int(bbox[3])
+        img_list.append(frame[y1:y2+1,x1:x 2+1])
     return img_list
 
 
@@ -632,19 +632,23 @@ def main():
                 last_time = ts
 
 
-        # print(boundingboxes)
+        print(boundingboxes)
         # print(points)
         # print(last_time)
         # print("shape of boundingboxes:",boundingboxes.shape)
         # print("input_queue size:",input_queue.qsize())
         # print("output_queue size:",output_queue.qsize())
         img_list = gen_crop_img(frame,boundingboxes)
+        if len(img_list)!=0:
+            print(frame.shape)
+            print(img_list[0].shape)
         for i in img_list:
             cv2.imshow('cropped_img',i)
 
 
         img = drawBoxes(frame, boundingboxes)
         cv2.imshow('img', img)
+        #cv2.imshow('crop_test',img[20:50,60:100])
         print("Display FPS = {0}".format(1.0/(timer()-current_time)))
 
         if cv2.waitKey(1) &0xFF == ord('q'):
