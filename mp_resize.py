@@ -235,14 +235,33 @@ def gen_crop_img(frame,bboxes):
     :return: a list of (original,(0,0)) + (cropped, (x1,y1,w,h))
     """
     img_list = []
+    img_cod = []
     for bbox in bboxes:
-        x1 = int(bbox[0])
-        y1 = int(bbox[1])
-        x2 = int(bbox[2])
-        y2 = int(bbox[3])
-        img_list.append(frame[y1:y2+1,x1:x 2+1])
-    return img_list
+        x1 = bbox[0]
+        y1 = bbox[1]
+        x2 = bbox[2]
+        y2 = bbox[3]
+        w = x2-x1
+        h = y2-y1
+        y1 = max(0,y1-w*0.2)
+        y2 = min(240,y2+w*0.2)
+        x1 = max(0,x1-w*0.2)
+        x2 = min(320,x2+w*0.2)
+        img_list.append(frame[int(y1):int(y2)+1,int(x1):int(x2)+1])
+        img_cod.append((int(y1),int(x1)))
+    return img_list,img_cod
 
+def offset_bboxes(bboxes,cod):
+    """
+    offset bboxes as defined in cod
+    """
+    for box in bboxes:
+        box[0] += cod[0]
+        box[1] += cod[0]
+        box[2] += cod[1]
+        box[3] += cod[1]
+    
+    return bboxes
 
 def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
 
@@ -561,14 +580,14 @@ def detect_process(qin,qout):
     RNet = caffe.Net(caffe_model_path+"/det2.prototxt", caffe_model_path+"/det2.caffemodel", caffe.TEST)
     ONet = caffe.Net(caffe_model_path+"/det3.prototxt", caffe_model_path+"/det3.caffemodel", caffe.TEST)
 
-    qout.put(('Initialized',None,None)) # signal main process that initialization has completed
+    qout.put(('Initialized',None)) # signal main process that initialization has completed
 
     while True:
         if qin.empty():
             continue
 
-        frame_gray, time_stamp = qin.get()
-        if time_stamp == 'Exit': break # When Exit is put into queue, the process should terminate
+        frame_gray, coord = qin.get()
+        if coord == 'Exit': break # When Exit is put into queue, the process should terminate
 
         img = cv2.cvtColor(frame_gray, cv2.COLOR_GRAY2BGR)
 
@@ -580,7 +599,7 @@ def detect_process(qin,qout):
         # check rgb position
         #tic()
         boundingboxes, points = detect_face(img_matlab, minsize, PNet, RNet, ONet, threshold, False, factor)
-        qout.put((boundingboxes,points,time_stamp))
+        qout.put((boundingboxes,points,coord))
         #toc()
 
 
@@ -600,6 +619,10 @@ def main():
     output_queue = Queue()
 
     detect_p_list = []
+    crop_img = []
+    crop_cod = []
+    img_cod = []
+    
     for i in range(process_num):
         detect_p_list.append(Process(target=detect_process,args=(input_queue,output_queue)))
         detect_p_list[i].daemon = True
@@ -618,18 +641,26 @@ def main():
         #Capture frame-by-frame
         __, frame = cap.read()
         img_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        for c_img in crop_img:
+            c_img = cv2.cvtColor(c_img, cv2.COLOR_BGR2GRAY)
+        
+        img_cod = [(img_gray,(0,0))]
+        for (img,cod) in zip(crop_img,crop_cod):
+            img_cod.append((img,cod))
+        
         current_time = timer()
         #sleep(0.01)# small delay to prevent overload
-        input_queue.put((img_gray,current_time))
+        for imco in img_cod:
+            input_queue.put(imco)
 
 
         if not output_queue.empty():
-            _boundingboxes, _points, ts = output_queue.get()
-            if ts - last_time > 0:
-                print("Detection FPS = {0}".format(1.0/(ts-last_time)))
-                boundingboxes = _boundingboxes
-                points = _points
-                last_time = ts
+            _bboxes, points, coords = output_queue.get()
+            #print("Detection FPS = {0}".format(1.0/(ts-last_time)))
+            bboxes = offset_bboxes(_bboxes,coords)
+            boundingboxes.append(bboxes)
+            #last_time = ts
+
 
 
         print(boundingboxes)
@@ -638,17 +669,16 @@ def main():
         # print("shape of boundingboxes:",boundingboxes.shape)
         # print("input_queue size:",input_queue.qsize())
         # print("output_queue size:",output_queue.qsize())
-        img_list = gen_crop_img(frame,boundingboxes)
-        if len(img_list)!=0:
-            print(frame.shape)
-            print(img_list[0].shape)
-        for i in img_list:
+        crop_img,crop_cod = gen_crop_img(frame,boundingboxes)
+        #if len(crop_img)!=0:
+        #    print(frame.shape)
+        #    print(crop_img[0].shape)
+        for i in crop_img:
             cv2.imshow('cropped_img',i)
 
 
         img = drawBoxes(frame, boundingboxes)
         cv2.imshow('img', img)
-        #cv2.imshow('crop_test',img[20:50,60:100])
         print("Display FPS = {0}".format(1.0/(timer()-current_time)))
 
         if cv2.waitKey(1) &0xFF == ord('q'):
@@ -656,7 +686,7 @@ def main():
 
     #Terminate subprocesses
     for i in range(process_num):
-        input_queue.put((None,'Exit',None))
+        input_queue.put((None,'Exit'))
     join_process(detect_p_list)
 
     #When everything's done, release capture
