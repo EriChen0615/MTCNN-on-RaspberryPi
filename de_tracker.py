@@ -9,6 +9,7 @@ from python_wrapper import *
 import os
 from timeit import default_timer as timer
 from tracker import Tracker
+from time import sleep
 
 def bbreg(boundingbox, reg):
     reg = reg.T 
@@ -257,7 +258,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         ws = int(np.ceil(w*scale))
 
         if fastresize:
-            im_data = (img-127.5)*0.00n'm78125 # [0,255] -> [-1,1]
+            im_data = (img-127.5)*0.0078125 # [0,255] -> [-1,1]
             im_data = cv2.resize(im_data, (ws,hs)) # default is bilinear
         else: 
             im_data = cv2.resize(img, (ws,hs)) # default is bilinear
@@ -537,11 +538,14 @@ def main():
     ONet = caffe.Net(caffe_model_path+"/det3.prototxt", caffe_model_path+"/det3.caffemodel", caffe.TEST)
 
     found = False
+    
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH,320)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT,240)
     while True: 
         #Capture frame-by-frame
+        print("-------------------------")
         __, frame = cap.read()
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH,320)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT,240)
+
 
         if not found:
             img = frame
@@ -557,19 +561,24 @@ def main():
         t_start = timer()
         boundingboxes, points = detect_face(img_matlab, minsize, PNet, RNet, ONet, threshold, False, factor)
         t_end = timer()
+        print("detection fps:",1/(t_end-t_start))
         print("Shape of boundingboxes: ",boundingboxes.shape)
-
-        if found:
+        
+        
+        if found and len(boundingboxes)!=0:
             tracker.update_result(boundingboxes[0])
-            tracker.update_img(frame)
+            #tracker.update_img(frame)
             boundingboxes = np.array([tracker.get_result_bbox()])
-
+        
+        if found:
+            tracker.update_img(frame)
+            
 
         if len(boundingboxes)!=0 and found==False:
             found = True
             tracker = Tracker(spawn_box=boundingboxes[0],total_width=320,total_height=240,id=1)
-            tracker.update_img(img)
-            print(Tracker)
+            tracker.update_img(frame)
+            #print(tracker)
         #print("Total elapsed time {0}".format(t_end-t_start))
         #toc()
 
@@ -582,18 +591,20 @@ def main():
         #    shutil.copy(imgpath, '/home/duino/Videos/3/disdata/negetive/'+os.path.split(imgpath)[1] ) 
         if not found:
             img = drawBoxes(img, boundingboxes)
-        cv2.imshow('img', img)
-        if found:
+            cv2.imshow('img',img)
+        else:
+            #print(tracker)
+            #print("result bbox:",tracker.get_result_bbox())
             c_img = tracker.get_window_img()
             cv2.imshow('track window',c_img)
+            _img = frame.copy()
 
-        # uncomment to run cycle by cycle
-        while cv2.waitKey(1) &0xFF != ord('n'):
-            pass
+            _img = drawBoxes(_img,np.array([tracker.get_result_bbox()]))
+            cv2.imshow('found_img',_img)
 
-        while(cv2.waitKey(0)!=27):
-            pass
-
+        #while(cv2.waitKey(0)!=27):
+        #    pass
+        sleep(0.01)
 
         #if boundingboxes.shape[0] > 0:
         #    error.append[imgpath]

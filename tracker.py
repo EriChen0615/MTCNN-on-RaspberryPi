@@ -61,7 +61,7 @@ class Tracker:
         :param img: new frame
         :return:
         """
-        self.img = img[self.window[1]:self.window[3]+1,self.window[0]:self.window[2]+1]
+        self.img = img[int(self.window[1]):int(self.window[3]+1),int(self.window[0]):int(self.window[2]+1)]
 
     def update_result(self,boundingbox):
         """
