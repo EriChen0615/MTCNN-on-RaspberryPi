@@ -551,11 +551,10 @@ def detect_process(qin,qout):
         if qin.empty():
             continue
 
-        frame, time_stamp = qin.get()
+        frame_gray, time_stamp = qin.get()
         if time_stamp == 'Exit': break # When Exit is put into queue, the process should terminate
 
-        img_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        img = cv2.cvtColor(img_gray, cv2.COLOR_GRAY2BGR)
+        img = cv2.cvtColor(frame_gray, cv2.COLOR_GRAY2BGR)
 
         img_matlab = img.copy()
         tmp = img_matlab[:,:,2].copy()
@@ -602,9 +601,10 @@ def main():
         print('--------------------------------------')
         #Capture frame-by-frame
         __, frame = cap.read()
+        img_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         current_time = timer()
-        sleep(0.01)# small delay to prevent overload
-        input_queue.put((frame,current_time))
+        #sleep(0.01)# small delay to prevent overload
+        input_queue.put((img_gray,current_time))
 
         
         if not output_queue.empty():
