@@ -584,6 +584,9 @@ def main():
     time.sleep(2.0)
     fps = FPS().start()
     
+    #here try to use the background subtractor to reduce the background 
+    fgbg = cv2.bgsegm.createBackgroundSubtractorGMG()
+
 
 
     minsize = 20
@@ -602,7 +605,8 @@ def main():
         start = timer()
 
         frame = vs.read()
-        #frame = imutils.resize(frame, width=400) #do we need to do the resize?
+        masked_frame = fgbg.apply(frame)
+        CV2.imshow('subtracted',masked_frame)
                             
 # convert the frame to gray scale and restore the BGR info
 
@@ -613,6 +617,7 @@ def main():
 
         img = restore
         #img = frame
+        
         img_matlab = img.copy()
         tmp = img_matlab[:,:,2].copy()
         img_matlab[:,:,2] = img_matlab[:,:,0]
@@ -637,6 +642,7 @@ def main():
 
         img = drawBoxes(frame, boundingboxes)
         cv2.imshow('cam', img)
+        #cv2.imshow('cam',masked_frame)
         
         if cv2.waitKey(1) &0xFF == ord('q'):
             break

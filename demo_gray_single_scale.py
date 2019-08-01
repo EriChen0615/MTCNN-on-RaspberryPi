@@ -211,7 +211,7 @@ def drawBoxes(im, boxes):
     x2 = boxes[:,2]
     y2 = boxes[:,3]
     for i in range(x1.shape[0]):
-        cv2.rectangle(im, (int(x1[i]), int(y1[i])), (int(x2[i]), int(y2[i])), (0,255,0), 1)
+        cv2.rectangle(im, (int(x1[i]), int(y1[i])), (int(x2[i]), int(y2[i])), (0,255,0), 1)     
     return im
 
 from time import time
@@ -578,7 +578,24 @@ def main():
 
         img = drawBoxes(frame, boundingboxes)
         cv2.imshow('img', img)
-
+	
+        a11 = boundingboxes
+        x1 = a11[:,0]
+        y1 = a11[:,1]
+        x2 = a11[:,2]
+        y2 = a11[:,3]
+        w = x2 - x1
+        h = y2 - y1
+        x1 = x1 + w/2 - w*1.4/2
+        x2 = x2 - w/2 + w*1.4/2
+        y1 = y1 + h/2 - h*1.4/2
+        y2 = y2 - h/2 + h*1.4/2
+        for i in range(x1.shape[0]):
+            ccrop = img[int(y1[i]):int(y2[i]), int(x1[i]):int(x2[i])]
+            cv2.imshow('test', ccrop)
+        while(cv2.waitKey(0) != 97):
+            pass
+        
         if cv2.waitKey(1) &0xFF == ord('q'):
             break
 
