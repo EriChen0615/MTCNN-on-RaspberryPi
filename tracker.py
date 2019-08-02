@@ -36,7 +36,7 @@ class Tracker:
             sets self.waiting flag. Intend to signal data has been put
     """
         
-    def __init__(self,spawn_box,total_width,total_height,_id,w_ratio=0.4,h_ratio=0.4):
+    def __init__(self,spawn_box,total_width,total_height,_id,img=None,w_ratio=0.4,h_ratio=0.4):
         self._id = _id
         self.result_bbox = spawn_box # result_box [x1,y1,x2,y2,score]
         self.total_width = total_width
@@ -47,7 +47,8 @@ class Tracker:
         self.window = np.zeros(4)
         self._update_window()
 
-        self.img = None
+        self.img = img
+        self.update_img(img)
 
         self.last_time = timer()
         self.fps = 0

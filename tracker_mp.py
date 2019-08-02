@@ -263,6 +263,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor,fi
             scales.append(m * pow(factor, factor_count))
             minl *= factor
             factor_count += 1
+        scales = [0.75]
     
     # first stage
     #scales = [0.128, 0.08, 0.148, 0.4, 0.1]
@@ -577,7 +578,7 @@ def detect_process(qin,qout):
         if _id==0: # if full-size colour image
             boundingboxes, points = detect_face(img_matlab, minsize, PNet, RNet, ONet, threshold, False, factor)
         else:
-            boundingboxes, points = detect_face(img_matlab, 24, PNet, RNet, ONet, threshold, False, 0.6,fix_scale=True)
+            boundingboxes, points = detect_face(img_matlab, 16, PNet, RNet, ONet, threshold, False, 0.6,fix_scale=True)
 
         qout.put((boundingboxes,_id))
         #toc()
@@ -652,11 +653,11 @@ def main():
                             spawn = False
                             break
                     if spawn:
-                        trackers[new_id] = Tracker(spawn_box=box,total_width=320,total_height=240,_id=new_id)
                         if not gray:
-                            trackers[new_id].update_img(frame)
+                            trackers[new_id] = Tracker(spawn_box=box,total_width=320,total_height=240,_id=new_id,img=frame)
                         else:
-                            trackers[new_id].update_img(img_gray)
+                            trackers[new_id] = Tracker(spawn_box=box,total_width=320,total_height=240,_id=new_id,img=frame)
+                        print(trackers[new_id])
                         new_id += 1
             else:
                 if len(boxes)!=1: 
