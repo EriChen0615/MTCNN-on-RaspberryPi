@@ -258,7 +258,10 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor,fi
             factor_count += 1
         scales = [0.128, 0.08, 0.148, 0.4, 0.1]
     else:
-        scales = [0.46,0.75]
+        scales = [0.75,0.45,0.27,0.162,0.09]
+    for s in scales:
+        if h*s < 12 or w*s < 12:
+            scales.remove(s)
     # first stage
     #scales = [0.128, 0.08, 0.148, 0.4, 0.1]
     #tic()
@@ -664,15 +667,15 @@ def main():
                                 trackers[_id].update_img(frame)
                             print(trackers[_id])
                         
-        for t in trackers.values():
-            if not gray:
-                t.update_img(frame)
-            else:
-                t.update_img(img_gray)
+        #for t in trackers.values():
+        #    if not gray:
+        #        t.update_img(frame)
+        #    else:
+        #        t.update_img(img_gray)
 
         #Generate next batch of imgs to be processed by workers
         process_list = []
-        if search_complete:
+        if search_complete and timer()-last_time > 1.0: # restrict search fps
             print("search fps is {0}".format(1/(timer()-last_time)))
             last_time = timer()
             if not gray:
@@ -680,7 +683,9 @@ def main():
             else:
                 process_list.append((img_gray,0))
         for t in trackers.values():
-            process_list.append((t.get_window_img(),t.get_id()))
+            if not t.waiting: # if the updated img has not been put into the queue
+                process_list.append((t.get_window_img(),t.get_id()))
+                t.wait()
         for data in process_list:
             input_queue.put(data)
             print("Data of length {0} is put into input_queue".format(len(data[0])))

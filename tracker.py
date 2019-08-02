@@ -9,11 +9,15 @@ class Tracker:
         1. call update_result
             self.result_box is updated
             self.window is updated
+            self.waiting is set to False, meaning 
         2. call update_image
             self.img is updated
         3. get_window_img()
         4. get_result_bbox()
+        5. wait()
+            sets self.waiting flag. Intend to signal data has been put
     """
+        
     def __init__(self,spawn_box,total_width,total_height,_id,w_ratio=0.4,h_ratio=0.4):
         self._id = _id
         self.result_bbox = spawn_box # result_box [x1,y1,x2,y2,score]
@@ -29,6 +33,7 @@ class Tracker:
 
         self.last_time = timer()
         self.fps = 0
+        self.waiting = False
 
     def _update_window(self):
         """
@@ -57,7 +62,7 @@ class Tracker:
         return result_bbox
 
     def __repr__(self):
-        return "Tracker id {0}\nTracker window:{1}\n Tracker fps:{2}".format(self._id,self.window,self.fps)
+        return "Tracker id {0}\nTracker window:{1}\nTracker fps:{2}".format(self._id,self.window,self.fps)
 
     def update_img(self,img):
         """
@@ -79,7 +84,9 @@ class Tracker:
         # update fps
         self.fps = 1/(timer()-self.last_time)
         self.last_time = timer()
-
+        
+        self.waiting = False    # Enable the tracker to put data into input_queue
+        
         return self.result_bbox
 
     def get_id(self):
@@ -93,6 +100,9 @@ class Tracker:
 
     def get_fps(self):
         return self.fps
+        
+    def wait(self):
+        self.waiting = True
 
 if __name__ == '__main__':
     img = np.random.rand(320,240,3)
