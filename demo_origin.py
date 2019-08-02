@@ -554,11 +554,10 @@ def main():
             #cv2.rectangle(img, (int(boundingboxes[i][1]), int(boundingboxes[i][0])), (int(boundingboxes[i][3]), int(boundingboxes[i][2])), (0,255,0), 1)    
 
         img = drawBoxes(img, boundingboxes)
-        cv2.imshow('img', img)
-        ch = cv2.waitKey(0) & 0xFF
-        if ch == 27:
-            break
-
+        cv2.imshow(imgpath, img)
+        while(cv2.waitKey(0)!=27):
+            pass
+        continue
 
         if boundingboxes.shape[0] > 0:
             error.append[imgpath]

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+
 # -*- coding: utf-8 -*-
 
 import _init_paths
@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 from python_wrapper import *
 import os
+from timeit import default_timer as timer
 
 def bbreg(boundingbox, reg):
     reg = reg.T 
@@ -212,8 +213,24 @@ def drawBoxes(im, boxes):
     y2 = boxes[:,3]
     for i in range(x1.shape[0]):
         cv2.rectangle(im, (int(x1[i]), int(y1[i])), (int(x2[i]), int(y2[i])), (0,255,0), 1)
+    print("draw box.")
     return im
 
+def c_drawBoxes(original_im, boxes):
+    ratio = original_im.shape[0]/original_im.shape[1]
+    ratio_0 = original_im.shape[0]/20
+    ratio_1 = original_im.shape[1]/20
+    x1 = boxes[:,0]
+    y1 = boxes[:,1]
+    x2 = boxes[:,2]
+    y2 = boxes[:,3]
+    for i in range(x1.shape[0]):
+        if ratio <=1:
+            cv2.rectangle(original_im, (int(x1[i]*ratio_0), int(y1[i]*ratio_0)), (int(x2[i]*ratio_0), int(y2[i]*ratio_0)), (0,255,0), 1)
+        if ratio >1:
+            cv2.rectangle(original_im, (int(x1[i]*ratio_1), int(y1[i]*ratio_1)), (int(x2[i]*ratio_1), int(y2[i]*ratio_1)), (0,255,0), 1)
+    print("draw box.")
+    return original_im
 from time import time
 _tstart_stack = []
 def tic():
@@ -222,7 +239,7 @@ def toc(fmt="Elapsed: %s s"):
     print(fmt % (time()-_tstart_stack.pop()))
 
 
-def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
+def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor, singlescale = 0):
     
     img2 = img.copy()
 
@@ -241,19 +258,27 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
     #total_boxes = np.load('total_boxes_242.npy')
     #total_boxes = np.load('total_boxes_101.npy')
 
-    
-    # create scale pyramid
-    scales = []
-    while minl >= 12:
-        scales.append(m * pow(factor, factor_count))
-        minl *= factor
-        factor_count += 1
+    if singlescale == 0:
+        print('image pyramid')
+        # create scale pyramid
+        scales = []
+        while minl >= 12:
+            scales.append(m * pow(factor, factor_count))
+            minl *= factor
+            factor_count += 1
+    else:
+        print('single scale')
+        scales = [0.75]
     
     # first stage
+    t_start = timer()
     for scale in scales:
         hs = int(np.ceil(h*scale))
         ws = int(np.ceil(w*scale))
-
+        
+        #im_debug = cv2.resize(img,(ws,hs))
+        #pause_show(im_debug,'pyramid')
+        
         if fastresize:
             im_data = (img-127.5)*0.0078125 # [0,255] -> [-1,1]
             im_data = cv2.resize(im_data, (ws,hs)) # default is bilinear
@@ -267,6 +292,8 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         im_data = np.array([im_data], dtype = np.float)
         PNet.blobs['data'].reshape(1, 3, ws, hs)
         PNet.blobs['data'].data[...] = im_data
+        
+
         out = PNet.forward()
     
         boxes = generateBoundingBox(out['prob1'][0,1,:,:], out['conv4-2'][0], scale, threshold[0])
@@ -274,21 +301,27 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
             #print boxes[4:9]
             #print 'im_data', im_data[0:5, 0:5, 0], '\n'
             #print 'prob1', out['prob1'][0,0,0:3,0:3]
-
+            
+            t_start = timer()
             pick = nms(boxes, 0.5, 'Union')
-
+            t_end = timer()
+            #print("Time for NMS {0}".format(t_end-t_start))
+            
             if len(pick) > 0 :
                 boxes = boxes[pick, :]
 
         if boxes.shape[0] != 0:
             total_boxes = np.concatenate((total_boxes, boxes), axis=0)
-         
+            print("find box scale", scale)
+    
+    t_end = timer()
+    #print("Time for PNet.forward {0}".format(t_end-t_start))
     #np.save('total_boxes_101.npy', total_boxes)
 
     #####
     # 1 #
     #####
-    print("[1]:",total_boxes.shape[0])
+    #print("[1]:",total_boxes.shape[0])
     #print total_boxes
     #return total_boxes, [] 
 
@@ -298,7 +331,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         # nms
         pick = nms(total_boxes, 0.7, 'Union')
         total_boxes = total_boxes[pick, :]
-        print("[2]:",total_boxes.shape[0])
+        #print("[2]:",total_boxes.shape[0])
         
         # revise and convert to square
         regh = total_boxes[:,3] - total_boxes[:,1]
@@ -316,10 +349,10 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         #print total_boxes
 
         total_boxes = rerec(total_boxes) # convert box to square
-        print("[4]:",total_boxes.shape[0])
+        #print("[4]:",total_boxes.shape[0])
         
         total_boxes[:,0:4] = np.fix(total_boxes[:,0:4])
-        print("[4.5]:",total_boxes.shape[0])
+        #print("[4.5]:",total_boxes.shape[0])
         #print total_boxes
         [dy, edy, dx, edx, y, ey, x, ex, tmpw, tmph] = pad(total_boxes, w, h)
 
@@ -372,7 +405,11 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         
         RNet.blobs['data'].reshape(numbox, 3, 24, 24)
         RNet.blobs['data'].data[...] = tempimg
+        
+        t_start = timer()
         out = RNet.forward()
+        t_end = timer()
+        #print("Time for RNet.forward {0}".format(t_end-t_start))
 
         #print out['conv5-2'].shape
         #print out['prob1'].shape
@@ -384,7 +421,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         
         score =  np.array([score[pass_t]]).T
         total_boxes = np.concatenate( (total_boxes[pass_t, 0:4], score), axis = 1)
-        print("[5]:",total_boxes.shape[0])
+        #print("[5]:",total_boxes.shape[0])
         #print total_boxes
 
         #print "1.5:",total_boxes.shape
@@ -396,16 +433,16 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
             #print 'pick', pick
             if len(pick) > 0 :
                 total_boxes = total_boxes[pick, :]
-                print("[6]:",total_boxes.shape[0])
+                #print("[6]:",total_boxes.shape[0])
                 total_boxes = bbreg(total_boxes, mv[:, pick])
-                print("[7]:",total_boxes.shape[0])
+                #print("[7]:",total_boxes.shape[0])
                 total_boxes = rerec(total_boxes)
-                print("[8]:",total_boxes.shape[0])
+                #print("[8]:",total_boxes.shape[0])
             
         #####
         # 2 #
         #####
-        print("2:",total_boxes.shape)
+        #print("2:",total_boxes.shape)
 
         numbox = total_boxes.shape[0]
         if numbox > 0:
@@ -433,7 +470,11 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
             tempimg = np.swapaxes(tempimg, 1, 3)
             ONet.blobs['data'].reshape(numbox, 3, 48, 48)
             ONet.blobs['data'].data[...] = tempimg
+            
+            t_start = timer()
             out = ONet.forward()
+            t_end = timer()
+            #print("Time for ONet.forward {0}".format(t_end-t_start))
             
             score = out['prob1'][:,1]
             points = out['conv6-3']
@@ -441,7 +482,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
             points = points[pass_t, :]
             score = np.array([score[pass_t]]).T
             total_boxes = np.concatenate( (total_boxes[pass_t, 0:4], score), axis=1)
-            print("[9]:",total_boxes.shape[0])
+            #print("[9]:",total_boxes.shape[0])
             
             mv = out['conv6-2'][pass_t, :].T
             w = total_boxes[:,3] - total_boxes[:,1] + 1
@@ -452,19 +493,19 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
 
             if total_boxes.shape[0] > 0:
                 total_boxes = bbreg(total_boxes, mv[:,:])
-                print("[10]:",total_boxes.shape[0])
+                #print("[10]:",total_boxes.shape[0])
                 pick = nms(total_boxes, 0.7, 'Min')
                 
                 #print pick
                 if len(pick) > 0 :
                     total_boxes = total_boxes[pick, :]
-                    print("[11]:",total_boxes.shape[0])
+                    #print("[11]:",total_boxes.shape[0])
                     points = points[pick, :]
 
     #####
     # 3 #
     #####
-    print("3:",total_boxes.shape)
+    #print("3:",total_boxes.shape)
 
     return total_boxes, points
 
@@ -505,13 +546,54 @@ def haveFace(img, facedetector):
     containFace = (True, False)[boundingboxes.shape[0]==0]
     return containFace, boundingboxes
 
+def pause_show(img=None,title=None):
+    if not (img is None or title is None):
+        cv2.imshow(title,img)
+    while(cv2.waitKey(0)!=27):
+        pass
+        
+def gen_crop_img(frame,bboxes):
+    """
+    Generate cropped images according to bounding boxes to reduce input size
+    :param frame: current frame
+    :param bboxes: last bounding box
+    :return: a list of (original,(0,0)) + (cropped, (x1,y1,w,h))
+    """
+    img_list = []
+    img_cod = []
+    for bbox in bboxes:
+        x1 = bbox[0]
+        y1 = bbox[1]
+        x2 = bbox[2]
+        y2 = bbox[3]
+        w = x2-x1
+        h = y2-y1
+        y1 = max(0,y1-w*0.2)
+        y2 = min(240,y2+w*0.2)
+        x1 = max(0,x1-w*0.2)
+        x2 = min(320,x2+w*0.2)
+        img_list.append(frame[int(y1):int(y2)+1,int(x1):int(x2)+1])
+        img_cod.append((int(x1),int(y1),int(x2),int(y2)))
+    return img_list,img_cod
+
+def offset_bboxes(bboxes,cod):
+    """
+    offset bboxes as defined in cod
+    """
+    for box in bboxes:
+        box[0] += cod[0]
+        box[1] += cod[0]
+        box[2] += cod[1]
+        box[3] += cod[1]
+    
+    return bboxes
+
+
 def main():
-    #imglistfile = "./file.txt"
-    #imglistfile = "/home/duino/project/mtcnn/error.txt"
-    #imglistfile = "/home/duino/iactive/mtcnn/all.txt"
-    imglistfile = "./imglist.txt"
-    #imglistfile = "/home/duino/iactive/mtcnn/file_n.txt"
-    #imglistfile = "/home/duino/iactive/mtcnn/file.txt"
+    cap = cv2.VideoCapture(0)
+
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH,320)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT,240)
     minsize = 20
 
     caffe_model_path = "./model"
@@ -523,23 +605,65 @@ def main():
     PNet = caffe.Net(caffe_model_path+"/det1.prototxt", caffe_model_path+"/det1.caffemodel", caffe.TEST)
     RNet = caffe.Net(caffe_model_path+"/det2.prototxt", caffe_model_path+"/det2.caffemodel", caffe.TEST)
     ONet = caffe.Net(caffe_model_path+"/det3.prototxt", caffe_model_path+"/det3.caffemodel", caffe.TEST)
+    
+    count_whole = 0
+    count_crop = 0
+    while True: 
+        count_whole += 1
+        #Capture frame-by-frame
+        print("---------------------------")
+        __, frame = cap.read()
 
-
-    #error = []
-    f = open(imglistfile, 'r')
-    for imgpath in f.readlines():
-        imgpath = imgpath.split('\n')[0]
-        print("######\n", imgpath)
-        img = cv2.imread(imgpath)
+        
+        img = frame
         img_matlab = img.copy()
         tmp = img_matlab[:,:,2].copy()
         img_matlab[:,:,2] = img_matlab[:,:,0]
         img_matlab[:,:,0] = tmp
-
+        #print('get whole frame')
         # check rgb position
+        #tic()
+        t_start = timer()
+        boundingboxes, points = detect_face(img_matlab, minsize, PNet, RNet, ONet, threshold, False, factor, 0)
+        #boundingboxes, points = detect_face(img_matlab, 12, PNet, RNet, ONet, threshold, False, 0.9)
+        #print('whole, boxes, detected')
+        t_end = timer()
+        print("Runtime for whole image:",t_end-t_start)
+        #print("whole image", count_whole)
+        if len(boundingboxes)!=0:
+            c_img_list, __ = gen_crop_img(frame,boundingboxes)
+            count_crop += 1
+        else:
+            continue
+        
+
+        c_img = c_img_list[0].copy()
+        c_img_matlab = c_img.copy()
+        c_tmp = c_img_matlab[:,:,2].copy()
+        c_img_matlab[:,:,2] = c_img_matlab[:,:,0]
+        c_img_matlab[:,:,0] = c_tmp
+        #print('cropped')
+        
+        #pause_show(c_img_matlab, 'before detect')
+        pause_show(c_img, 'cropped')
+        print(c_img_matlab.shape)
+        c_img_ratio = c_img_matlab.shape[0]/c_img_matlab.shape[1]
         tic()
-        boundingboxes, points = detect_face(img_matlab, minsize, PNet, RNet, ONet, threshold, False, factor)
+        if c_img_ratio <= 1:
+            c_resized = cv2.resize(c_img_matlab, (int(20/c_img_ratio)), 20)
+        if c_img_ratio > 1:
+            c_resized = cv2.resize(c_img_matlab, (20, int(20*c_img_ratio) ))
         toc()
+        pause_show(c_resized, 'resized')
+        print('c_img_ratio:', c_img_ratio)
+        t_start = timer()
+        c_boundingboxes, points = detect_face(c_resized, 16, PNet, RNet, ONet, [0.9, 0.7, 0.7], False, 0.6, 1)
+        #print('crop-image detected')
+        t_end = timer()
+        print("Runtime for cropped image:",t_end-t_start)
+        #print("cropped image", count_crop)
+        t_end = timer()
+        #toc()
 
         ## copy img to positive folder
         #if boundingboxes.shape[0] > 0 :
@@ -547,23 +671,26 @@ def main():
         #    shutil.copy(imgpath, '/home/duino/Videos/3/disdata/positive/'+os.path.split(imgpath)[1] )
         #else:
         #    import shutil
-        #    shutil.copy(imgpath, '/home/duino/Videos/3/disdata/negetive/'+os.path.split(imgpath)[1] )
-
-
-        #for i in range(len(boundingboxes)):
-            #cv2.rectangle(img, (int(boundingboxes[i][1]), int(boundingboxes[i][0])), (int(boundingboxes[i][3]), int(boundingboxes[i][2])), (0,255,0), 1)    
+        #    shutil.copy(imgpath, '/home/duino/Videos/3/disdata/negetive/'+os.path.split(imgpath)[1] ) 
 
         img = drawBoxes(img, boundingboxes)
-        cv2.imshow('img', img)
-        ch = cv2.waitKey(0) & 0xFF
-        if ch == 27:
-            break
+        #print(img)
+        pause_show(img,'img')
+
+        #print('whole, draw')
+        
+        #pause_show(c_img, 'before drawing')
+        if c_boundingboxes.shape[0] == 1:
+            print("cropped image face detected!")
+        pause_show(c_drawBoxes(c_img,c_boundingboxes),'crop_det')
+        #cv2.imshow('crop_det', drawBoxes(c_img,c_boundingboxes))
+        #pause_show(c_img, 'after drawing')
+        
 
 
-        if boundingboxes.shape[0] > 0:
-            error.append[imgpath]
-    print(error)
-    f.close()
+        #if boundingboxes.shape[0] > 0:
+        #    error.append[imgpath]
+
 
 if __name__ == "__main__":
     main()

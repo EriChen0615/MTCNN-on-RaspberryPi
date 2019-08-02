@@ -7,6 +7,61 @@ import cv2
 import numpy as np
 from python_wrapper import *
 import os
+from timeit import default_timer as timer
+from picamera.array import PiRGBArray
+from picamera import PiCamera
+from threading import Thread
+import imutils
+from imutils.video import FPS
+
+
+RESOLUTION_W = 1296
+RESOLUTION_H = 976
+PI_FR = 40
+
+
+
+
+class PiVideoStream:
+
+    def __init__(self,resolution=(RESOLUTION_W,RESOLUTION_H),framerate=PI_FR):
+    #initialize the camera and the stream
+        self.camera = PiCamera()
+        self.camera.resolution =resolution
+        self.camera.framerate = framerate
+        self.rawCapture = PiRGBArray(self.camera, size=resolution)
+        self.stream = self.camera.capture_continuous(self.rawCapture, format="bgr", use_video_port = True)
+
+    #initialize the frame and teh variable used to indicate if the thread should be stopped
+        self.frame = None
+        self.stopped = False
+    
+    def start(self):
+    #start the thread to read frames from the video stream
+        Thread(target=self.update,args=()).start()
+        return self
+
+    def update(self):
+    #keep looping infinitely until the thread is stopped
+        for f in self.stream:
+        #grab the fram from the stream and clear the stream in preparation for the next frame 
+            self.frame = f.array
+            self.rawCapture.truncate(0)
+        
+        #if the thread indicator variable is set, stop the thread and camera resources
+            if self.stopped:
+                self.stream.close()
+                self.rawCapture.close()
+                self.camera.close()
+                return
+   
+    def read(self):
+    #return the frame most recently read
+        return self.frame
+
+    def stop(self):
+    #indicate that the thread should be stopped
+        self.stopped = True
 
 def bbreg(boundingbox, reg):
     reg = reg.T 
@@ -206,20 +261,21 @@ def generateBoundingBox(map, reg, scale, t):
 
 
 def drawBoxes(im, boxes):
-    x1 = boxes[:,0]
-    y1 = boxes[:,1]
-    x2 = boxes[:,2]
-    y2 = boxes[:,3]
+    x1 = boxes[:,0]*RESOLUTION_W / 320
+    y1 = boxes[:,1]*RESOLUTION_W / 320
+    x2 = boxes[:,2]*RESOLUTION_W / 320
+    y2 = boxes[:,3]*RESOLUTION_W / 320
     for i in range(x1.shape[0]):
-        cv2.rectangle(im, (int(x1[i]), int(y1[i])), (int(x2[i]), int(y2[i])), (0,255,0), 1)
+        cv2.rectangle(im, (int(x1[i]), int(y1[i])), (int(x2[i]), int(y2[i])), (0,255,0), int(1*RESOLUTION_W / 320))
+        cv2.putText(im, "Face Detected", (int(x2[i]+20), int(y2[i]+20)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2, cv2.LINE_AA)
     return im
 
-from time import time
+import time
 _tstart_stack = []
 def tic():
-    _tstart_stack.append(time())
+    _tstart_stack.append(time.time())
 def toc(fmt="Elapsed: %s s"):
-    print(fmt % (time()-_tstart_stack.pop()))
+    print(fmt % (time.time()-_tstart_stack.pop()))
 
 
 def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
@@ -249,7 +305,12 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         minl *= factor
         factor_count += 1
     
+
     # first stage
+    scales = [0.128, 0.08, 0.148, 0.1]
+    tic()
+    
+
     for scale in scales:
         hs = int(np.ceil(h*scale))
         ws = int(np.ceil(w*scale))
@@ -288,17 +349,22 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
     #####
     # 1 #
     #####
-    print("[1]:",total_boxes.shape[0])
+    print("Pnet boxes:",total_boxes.shape[0])
+    print("Pnet time:")
+    toc()
+
     #print total_boxes
     #return total_boxes, [] 
 
+    
+    tic()
 
     numbox = total_boxes.shape[0]
     if numbox > 0:
         # nms
         pick = nms(total_boxes, 0.7, 'Union')
         total_boxes = total_boxes[pick, :]
-        print("[2]:",total_boxes.shape[0])
+        #print("[2]:",total_boxes.shape[0])
         
         # revise and convert to square
         regh = total_boxes[:,3] - total_boxes[:,1]
@@ -316,10 +382,10 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         #print total_boxes
 
         total_boxes = rerec(total_boxes) # convert box to square
-        print("[4]:",total_boxes.shape[0])
+        #print("[4]:",total_boxes.shape[0])
         
         total_boxes[:,0:4] = np.fix(total_boxes[:,0:4])
-        print("[4.5]:",total_boxes.shape[0])
+        #print("[4.5]:",total_boxes.shape[0])
         #print total_boxes
         [dy, edy, dx, edx, y, ey, x, ex, tmpw, tmph] = pad(total_boxes, w, h)
 
@@ -384,7 +450,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         
         score =  np.array([score[pass_t]]).T
         total_boxes = np.concatenate( (total_boxes[pass_t, 0:4], score), axis = 1)
-        print("[5]:",total_boxes.shape[0])
+        #print("[5]:",total_boxes.shape[0])
         #print total_boxes
 
         #print "1.5:",total_boxes.shape
@@ -396,17 +462,20 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
             #print 'pick', pick
             if len(pick) > 0 :
                 total_boxes = total_boxes[pick, :]
-                print("[6]:",total_boxes.shape[0])
+                #print("[6]:",total_boxes.shape[0])
                 total_boxes = bbreg(total_boxes, mv[:, pick])
-                print("[7]:",total_boxes.shape[0])
+                #print("[7]:",total_boxes.shape[0])
                 total_boxes = rerec(total_boxes)
-                print("[8]:",total_boxes.shape[0])
-            
+                #print("[8]:",total_boxes.shape[0])
+        print("Rnet time:")
+        toc()
+      
         #####
         # 2 #
         #####
-        print("2:",total_boxes.shape)
+        #print("2:",total_boxes.shape)
 
+        tic()
         numbox = total_boxes.shape[0]
         if numbox > 0:
             # third stage
@@ -441,7 +510,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
             points = points[pass_t, :]
             score = np.array([score[pass_t]]).T
             total_boxes = np.concatenate( (total_boxes[pass_t, 0:4], score), axis=1)
-            print("[9]:",total_boxes.shape[0])
+            #print("[9]:",total_boxes.shape[0])
             
             mv = out['conv6-2'][pass_t, :].T
             w = total_boxes[:,3] - total_boxes[:,1] + 1
@@ -452,20 +521,25 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
 
             if total_boxes.shape[0] > 0:
                 total_boxes = bbreg(total_boxes, mv[:,:])
-                print("[10]:",total_boxes.shape[0])
+                #print("[10]:",total_boxes.shape[0])
                 pick = nms(total_boxes, 0.7, 'Min')
                 
                 #print pick
                 if len(pick) > 0 :
                     total_boxes = total_boxes[pick, :]
-                    print("[11]:",total_boxes.shape[0])
+                    #print("[11]:",total_boxes.shape[0])
                     points = points[pick, :]
 
     #####
     # 3 #
     #####
-    print("3:",total_boxes.shape)
-
+    #print("3:",total_boxes.shape)
+    print("Onet time:")
+    toc()
+    #for i in points:
+        #print(i)
+        #print(i[0])
+    #print("points:",points)
     return total_boxes, points
 
 
@@ -505,41 +579,70 @@ def haveFace(img, facedetector):
     containFace = (True, False)[boundingboxes.shape[0]==0]
     return containFace, boundingboxes
 
+
 def main():
-    #imglistfile = "./file.txt"
-    #imglistfile = "/home/duino/project/mtcnn/error.txt"
-    #imglistfile = "/home/duino/iactive/mtcnn/all.txt"
-    imglistfile = "./imglist.txt"
-    #imglistfile = "/home/duino/iactive/mtcnn/file_n.txt"
-    #imglistfile = "/home/duino/iactive/mtcnn/file.txt"
+    
+
+    # set the filter of the video -- VSCO! still not working maybe later
+
+    # here to try the method to moving the I/O blocking operations
+    # to a separate thread and maitaining a queue of decoded frames
+    # in an effort to improve FPS
+    # .read() method is a blocking I/O operation
+
+    camera = PiCamera()
+    camera.resolution = (RESOLUTION_W,RESOLUTION_H)
+    camera.framerate = PI_FR
+    rawCapture = PiRGBArray(camera, size=(RESOLUTION_W,RESOLUTION_H))
+    stream = camera.capture_continuous(rawCapture, format="bgr", use_video_port=True)
+    camera.close()
+
+
+    vs = PiVideoStream().start()
+    time.sleep(2.0)
+    fps = FPS().start()
+    
+
+
     minsize = 20
 
     caffe_model_path = "./model"
 
-    threshold = [0.6, 0.7, 0.7]
+    threshold = [0.6, 0.7, 0.7]  #initial threshold: 0.6 0.7 0.7
     factor = 0.709
     
-    caffe.set_mode_cpu()
+    caffe.set_mode_cpu()                            #comment the next few lines?
     PNet = caffe.Net(caffe_model_path+"/det1.prototxt", caffe_model_path+"/det1.caffemodel", caffe.TEST)
     RNet = caffe.Net(caffe_model_path+"/det2.prototxt", caffe_model_path+"/det2.caffemodel", caffe.TEST)
     ONet = caffe.Net(caffe_model_path+"/det3.prototxt", caffe_model_path+"/det3.caffemodel", caffe.TEST)
 
+    while True: 
+        start = timer()
+        print("---------------------------------------------")
+        frame = vs.read()
+        
+        print(frame.shape)
+        #frame = imutils.resize(frame, width=400) #do we need to do the resize?
+                            
+        # convert the frame to gray scale and restore the BGR info
 
-    #error = []
-    f = open(imglistfile, 'r')
-    for imgpath in f.readlines():
-        imgpath = imgpath.split('\n')[0]
-        print("######\n", imgpath)
-        img = cv2.imread(imgpath)
+        #grayFrame = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
+        #restore = cv2.cvtColor(grayFrame,cv2.COLOR_GRAY2BGR)
+        
+        
+
+        #img = restore
+        img = cv2.resize(frame, (320,240))
+        print(img.shape)
         img_matlab = img.copy()
         tmp = img_matlab[:,:,2].copy()
         img_matlab[:,:,2] = img_matlab[:,:,0]
         img_matlab[:,:,0] = tmp
 
         # check rgb position
-        tic()
+        #tic()
         boundingboxes, points = detect_face(img_matlab, minsize, PNet, RNet, ONet, threshold, False, factor)
-        toc()
+        #toc()
 
         ## copy img to positive folder
         #if boundingboxes.shape[0] > 0 :
@@ -550,20 +653,32 @@ def main():
         #    shutil.copy(imgpath, '/home/duino/Videos/3/disdata/negetive/'+os.path.split(imgpath)[1] )
 
 
-        #for i in range(len(boundingboxes)):
-            #cv2.rectangle(img, (int(boundingboxes[i][1]), int(boundingboxes[i][0])), (int(boundingboxes[i][3]), int(boundingboxes[i][2])), (0,255,0), 1)    
+        
+        img = drawBoxes(frame, boundingboxes)
+        print(img.shape)
+        for i in points:
+            for j in range(5):
+                cv2.circle(img, (int(i[j]*RESOLUTION_W / 320), int(i[j+5]*RESOLUTION_W / 320)), int(1*RESOLUTION_W / 320), (0,255,0),-1)
 
-        img = drawBoxes(img, boundingboxes)
-        cv2.imshow('img', img)
-        ch = cv2.waitKey(0) & 0xFF
-        if ch == 27:
+        cv2.namedWindow('cam', cv2.WINDOW_NORMAL)
+        cv2.resizeWindow('cam',RESOLUTION_W,RESOLUTION_H)
+        cv2.imshow('cam', img)
+        
+        if cv2.waitKey(1) &0xFF == ord('q'):
             break
+            
+        
+        end = timer()
+        print ("Total time:",end-start)
 
+        fps.update()
 
-        if boundingboxes.shape[0] > 0:
-            error.append[imgpath]
-    print(error)
-    f.close()
+    #When everything's done, release capture
+    #cap.release()
+    cv2.destroyAllWindows()
+    vs.stop()
+    vs.update()
+    
 
 if __name__ == "__main__":
     main()

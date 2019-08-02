@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+
 # -*- coding: utf-8 -*-
 
 import _init_paths
@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 from python_wrapper import *
 import os
+from timeit import default_timer as timer
 
 def bbreg(boundingbox, reg):
     reg = reg.T 
@@ -267,16 +268,23 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         im_data = np.array([im_data], dtype = np.float)
         PNet.blobs['data'].reshape(1, 3, ws, hs)
         PNet.blobs['data'].data[...] = im_data
+        
+        t_start = timer()
         out = PNet.forward()
+        t_end = timer()
+        print("Time for PNet.forward {0}".format(t_end-t_start))
     
         boxes = generateBoundingBox(out['prob1'][0,1,:,:], out['conv4-2'][0], scale, threshold[0])
         if boxes.shape[0] != 0:
             #print boxes[4:9]
             #print 'im_data', im_data[0:5, 0:5, 0], '\n'
             #print 'prob1', out['prob1'][0,0,0:3,0:3]
-
+            
+            t_start = timer()
             pick = nms(boxes, 0.5, 'Union')
-
+            t_end = timer()
+            print("Time for NMS {0}".format(t_end-t_start))
+            
             if len(pick) > 0 :
                 boxes = boxes[pick, :]
 
@@ -372,7 +380,11 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
         
         RNet.blobs['data'].reshape(numbox, 3, 24, 24)
         RNet.blobs['data'].data[...] = tempimg
+        
+        t_start = timer()
         out = RNet.forward()
+        t_end = timer()
+        print("Time for RNet.forward {0}".format(t_end-t_start))
 
         #print out['conv5-2'].shape
         #print out['prob1'].shape
@@ -433,7 +445,11 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor):
             tempimg = np.swapaxes(tempimg, 1, 3)
             ONet.blobs['data'].reshape(numbox, 3, 48, 48)
             ONet.blobs['data'].data[...] = tempimg
+            
+            t_start = timer()
             out = ONet.forward()
+            t_end = timer()
+            print("Time for ONet.forward {0}".format(t_end-t_start))
             
             score = out['prob1'][:,1]
             points = out['conv6-3']
@@ -506,12 +522,7 @@ def haveFace(img, facedetector):
     return containFace, boundingboxes
 
 def main():
-    #imglistfile = "./file.txt"
-    #imglistfile = "/home/duino/project/mtcnn/error.txt"
-    #imglistfile = "/home/duino/iactive/mtcnn/all.txt"
-    imglistfile = "./imglist.txt"
-    #imglistfile = "/home/duino/iactive/mtcnn/file_n.txt"
-    #imglistfile = "/home/duino/iactive/mtcnn/file.txt"
+    cap = cv2.VideoCapture(0)
     minsize = 20
 
     caffe_model_path = "./model"
@@ -524,22 +535,26 @@ def main():
     RNet = caffe.Net(caffe_model_path+"/det2.prototxt", caffe_model_path+"/det2.caffemodel", caffe.TEST)
     ONet = caffe.Net(caffe_model_path+"/det3.prototxt", caffe_model_path+"/det3.caffemodel", caffe.TEST)
 
+    while True: 
+        #Capture frame-by-frame
+        __, frame = cap.read()
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH,320)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT,240)
 
-    #error = []
-    f = open(imglistfile, 'r')
-    for imgpath in f.readlines():
-        imgpath = imgpath.split('\n')[0]
-        print("######\n", imgpath)
-        img = cv2.imread(imgpath)
+        img = frame
         img_matlab = img.copy()
         tmp = img_matlab[:,:,2].copy()
         img_matlab[:,:,2] = img_matlab[:,:,0]
         img_matlab[:,:,0] = tmp
 
         # check rgb position
-        tic()
+        #tic()
+        t_start = timer()
         boundingboxes, points = detect_face(img_matlab, minsize, PNet, RNet, ONet, threshold, False, factor)
-        toc()
+        t_end = timer()
+        print("Shape of boundingboxes: ",boundingboxes.shape)
+        print("Total elapsed time {0}".format(t_end-t_start))       
+        #toc()
 
         ## copy img to positive folder
         #if boundingboxes.shape[0] > 0 :
@@ -547,23 +562,18 @@ def main():
         #    shutil.copy(imgpath, '/home/duino/Videos/3/disdata/positive/'+os.path.split(imgpath)[1] )
         #else:
         #    import shutil
-        #    shutil.copy(imgpath, '/home/duino/Videos/3/disdata/negetive/'+os.path.split(imgpath)[1] )
-
-
-        #for i in range(len(boundingboxes)):
-            #cv2.rectangle(img, (int(boundingboxes[i][1]), int(boundingboxes[i][0])), (int(boundingboxes[i][3]), int(boundingboxes[i][2])), (0,255,0), 1)    
+        #    shutil.copy(imgpath, '/home/duino/Videos/3/disdata/negetive/'+os.path.split(imgpath)[1] ) 
 
         img = drawBoxes(img, boundingboxes)
         cv2.imshow('img', img)
-        ch = cv2.waitKey(0) & 0xFF
-        if ch == 27:
-            break
+
+        while(cv2.waitKey(0)!=27):
+            pass
 
 
-        if boundingboxes.shape[0] > 0:
-            error.append[imgpath]
-    print(error)
-    f.close()
+        #if boundingboxes.shape[0] > 0:
+        #    error.append[imgpath]
+
 
 if __name__ == "__main__":
     main()
