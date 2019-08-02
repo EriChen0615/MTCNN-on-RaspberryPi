@@ -557,8 +557,9 @@ def detect_process(qin,qout):
 
         img, _id = qin.get()
         if _id == 'Exit': break # When Exit is put into queue, the process should terminate
-
-        #img = cv2.cvtColor(frame_gray, cv2.COLOR_GRAY2BGR)
+        
+        if len(img.shape) == 2: # it is a gray scale image
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 
         img_matlab = img.copy()
         tmp = img_matlab[:,:,2].copy()
@@ -576,10 +577,25 @@ def detect_process(qin,qout):
         qout.put((boundingboxes,_id))
         #toc()
 
-def iou(a,b):
-    return 1.0
-    #TODO
 
+def IoU (a,b):
+    #a = [x1,y1,x2,y2,score]
+    w1 = a[2] - a[0] + 1
+    h1 = a[3] - a[1] + 1
+    w2 = b[2] - b[0] + 1
+    h2 = b[3] - b[1] + 1
+    xx1 = np.maximum(a[0],b[0])
+    yy1 = np.maximum(a[1],b[1])
+    xx2 = np.minimum(a[2],b[2])
+    yy2 = np.minimum(a[3],b[3])
+    w = np.maximum(0,xx2 - xx1 + 1)
+    h = np.maximum(0,yy2 - yy1 + 1)
+
+    inter = w * h
+    union = w1 * h1 + w2 * h2 - inter
+    
+    return inter / union    
+    
 def main():
 
     process_num = 3 # define the number of processes running detection task
@@ -611,7 +627,9 @@ def main():
         print('--------------------------------------')
         #Capture frame-by-frame
         __, frame = cap.read()
+        img_gray = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
         #Get detection result and update trackers accordingly
+        
         det_result = []
         while not output_queue.empty():
             det_result.append(output_queue.get())
@@ -624,7 +642,7 @@ def main():
                 for box in boxes:
                     spawn = True
                     for t in trackers.values():
-                        if iou(t.get_result_bbox(),box)>0.6:
+                        if IoU(t.get_result_bbox(),box)>0.6:
                             spawn = False
                             break
                     if spawn:
