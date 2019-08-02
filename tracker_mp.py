@@ -258,10 +258,12 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor,fi
             factor_count += 1
         scales = [0.128, 0.08, 0.148, 0.4, 0.1]
     else:
-        scales = [0.75,0.45,0.27,0.162,0.09]
-    for s in scales:
-        if h*s < 12 or w*s < 12:
-            scales.remove(s)
+        scales = []
+        while minl >= 12:
+            scales.append(m * pow(factor, factor_count))
+            minl *= factor
+            factor_count += 1
+    
     # first stage
     #scales = [0.128, 0.08, 0.148, 0.4, 0.1]
     #tic()
@@ -575,7 +577,7 @@ def detect_process(qin,qout):
         if _id==0: # if full-size colour image
             boundingboxes, points = detect_face(img_matlab, minsize, PNet, RNet, ONet, threshold, False, factor)
         else:
-            boundingboxes, points = detect_face(img_matlab, 16, PNet, RNet, ONet, threshold, False, factor,fix_scale=True)
+            boundingboxes, points = detect_face(img_matlab, 24, PNet, RNet, ONet, threshold, False, 0.6,fix_scale=True)
 
         qout.put((boundingboxes,_id))
         #toc()
@@ -651,10 +653,13 @@ def main():
                             break
                     if spawn:
                         trackers[new_id] = Tracker(spawn_box=box,total_width=320,total_height=240,_id=new_id)
-                        trackers[new_id].update_img(frame)
+                        if not gray:
+                            trackers[new_id].update_img(frame)
+                        else:
+                            trackers[new_id].update_img(img_gray)
                         new_id += 1
             else:
-                if len(boxes)==0: 
+                if len(boxes)!=1: 
                     if _id in trackers.keys(): # to avoid invalid key
                         del trackers[_id]
                 else:
@@ -688,7 +693,7 @@ def main():
                 t.wait()
         for data in process_list:
             input_queue.put(data)
-            print("Data of length {0} is put into input_queue".format(len(data[0])))
+            print("data size {0}".format(data[0].shape))
 
         #Generate boundingboxes to be drawn on this loop
         boundingboxes = np.ndarray((0,5))
