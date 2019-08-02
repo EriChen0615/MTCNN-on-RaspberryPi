@@ -558,7 +558,7 @@ def detect_process(qin,qout):
         img, _id = qin.get()
         if _id == 'Exit': break # When Exit is put into queue, the process should terminate
         
-        if len(img.shape) == 2: # it is a gray scale image
+        if len(img.shape) == 2: # if it is a gray scale image
             img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 
         img_matlab = img.copy()
@@ -622,6 +622,7 @@ def main():
     new_id = 1
     trackers = {}
     search_complete = True
+    gray = False
     last_time = timer()
     while True:
         print('--------------------------------------')
@@ -657,16 +658,25 @@ def main():
                     if _id in trackers.keys():
                         for box in boxes:
                             trackers[_id].update_result(box)
-                            trackers[_id].update_img(frame)
+                            if gray:
+                                trackers[_id].update_img(img_gray)
+                            else:
+                                trackers[_id].update_img(frame)
                         
         for t in trackers.values():
-            t.update_img(frame)
+            if not gray:
+                t.update_img(frame)
+            else:
+                t.update_img(img_gray)
             print(t)
 
         #Generate next batch of imgs to be processed by workers
         process_list = []
         if search_complete:
-            process_list.append((frame,0))
+            if not gray:
+                process_list.append((frame,0))
+            else:
+                process_list.append((img_gray,0))
         for t in trackers.values():
             process_list.append((t.get_window_img(),t.get_id()))
         for data in process_list:
