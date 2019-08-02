@@ -673,6 +673,8 @@ def main():
         #Generate next batch of imgs to be processed by workers
         process_list = []
         if search_complete:
+            print("search fps is {0}".format(1/timer()-last_time))
+            last_time = timer()
             if not gray:
                 process_list.append((frame,0))
             else:
