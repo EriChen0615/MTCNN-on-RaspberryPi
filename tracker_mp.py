@@ -258,7 +258,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor,fi
             factor_count += 1
         scales = [0.128, 0.08, 0.148, 0.4, 0.1]
     else:
-        scales = [0.25,0.46,0.75]
+        scales = [0.46,0.75]
     # first stage
     #scales = [0.128, 0.08, 0.148, 0.4, 0.1]
     #tic()
@@ -633,12 +633,17 @@ def main():
                         new_id += 1
             else:
                 if len(boxes)==0: 
-                    pass
-                    #del trackers[_id]
+                    if _id in trackers.keys(): # to avoid invalid key
+                        del trackers[_id]
                 else:
-                    for box in boxes:
-                        trackers[_id].update_result(box)
-                        trackers[_id].update_img(frame)
+                    if _id in trackers.keys():
+                        for box in boxes:
+                            trackers[_id].update_result(box)
+                            trackers[_id].update_img(frame)
+                        
+        for t in trackers.values():
+            t.update_img(frame)
+            print(t)
 
         #Generate next batch of imgs to be processed by workers
         process_list = []
