@@ -13,8 +13,8 @@ class Tracker:
         3. get_window_img()
         4. get_result_bbox()
     """
-    def __init__(self,spawn_box,total_width,total_height,id,w_ratio=0.4,h_ratio=0.4):
-        self.id = id
+    def __init__(self,spawn_box,total_width,total_height,_id,w_ratio=0.4,h_ratio=0.4):
+        self._id = _id
         self.result_bbox = spawn_box # result_box [x1,y1,x2,y2,score]
         self.total_width = total_width
         self.total_height = total_height
@@ -45,7 +45,7 @@ class Tracker:
         :param boundingbox:
         :return:
         """
-        result_bbox = np.zeros(4)
+        result_bbox = np.zeros(5)
         result_bbox[0] = int(boundingbox[0]+self.window[0])
         result_bbox[1] = int(boundingbox[1]+self.window[1])
         result_bbox[2] = int(boundingbox[2]+self.window[0])
@@ -53,7 +53,7 @@ class Tracker:
         return result_bbox
 
     def __repr__(self):
-        return "Tracker id {0}\nTracker window:{1}".format(self.id,self.window)
+        return "Tracker id {0}\nTracker window:{1}".format(self._id,self.window)
 
     def update_img(self,img):
         """
@@ -74,7 +74,7 @@ class Tracker:
         return self.result_bbox
 
     def get_id(self):
-        return self.id
+        return self._id
 
     def get_window_img(self):
         return self.img
@@ -85,7 +85,7 @@ class Tracker:
 if __name__ == '__main__':
     img = np.random.rand(320,240,3)
     spawn_box = np.array([0,0,200,200,0.9])
-    tracker = Tracker(spawn_box=spawn_box,total_width=320,total_height=240,id=1)
+    tracker = Tracker(spawn_box=spawn_box,total_width=320,total_height=240,_id=1)
     print(tracker)
 
     det_bbox = np.array([30,30,50,50,0.99])

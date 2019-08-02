@@ -256,8 +256,9 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor,fi
             scales.append(m * pow(factor, factor_count))
             minl *= factor
             factor_count += 1
+        scales = [0.128, 0.08, 0.148, 0.4, 0.1]
     else:
-        scales = [0.25,0.46]
+        scales = [0.25,0.46,0.75]
     # first stage
     #scales = [0.128, 0.08, 0.148, 0.4, 0.1]
     #tic()
@@ -548,7 +549,7 @@ def detect_process(qin,qout):
     RNet = caffe.Net(caffe_model_path+"/det2.prototxt", caffe_model_path+"/det2.caffemodel", caffe.TEST)
     ONet = caffe.Net(caffe_model_path+"/det3.prototxt", caffe_model_path+"/det3.caffemodel", caffe.TEST)
 
-    qout.put(('Initialized',None,None)) # signal main process that initialization has completed
+    qout.put(('Initialized',None)) # signal main process that initialization has completed
 
     while True:
         if qin.empty():
@@ -567,7 +568,7 @@ def detect_process(qin,qout):
         # check rgb position
 
         #tic()
-        if img.shape == (320,240,0):
+        if _id==0: # if full-size colour image
             boundingboxes, points = detect_face(img_matlab, minsize, PNet, RNet, ONet, threshold, False, factor)
         else:
             boundingboxes, points = detect_face(img_matlab, 16, PNet, RNet, ONet, threshold, False, factor,fix_scale=True)
@@ -576,7 +577,7 @@ def detect_process(qin,qout):
         #toc()
 
 def iou(a,b):
-    pass
+    return 1.0
     #TODO
 
 def main():
@@ -604,18 +605,18 @@ def main():
 
     new_id = 1
     trackers = {}
-    search_complete = False
+    search_complete = True
     last_time = timer()
     while True:
         print('--------------------------------------')
         #Capture frame-by-frame
         __, frame = cap.read()
-
         #Get detection result and update trackers accordingly
         det_result = []
         while not output_queue.empty():
             det_result.append(output_queue.get())
         for result in det_result:
+            print("result:",result[0])
             _id = result[1]
             boxes = result[0]
             if _id==0:
@@ -629,11 +630,15 @@ def main():
                     if spawn:
                         trackers[new_id] = Tracker(spawn_box=box,total_width=320,total_height=240,_id=new_id)
                         trackers[new_id].update_img(frame)
+                        new_id += 1
             else:
-                if len(box)==0: del trackers[_id]
+                if len(boxes)==0: 
+                    pass
+                    #del trackers[_id]
                 else:
-                    trackers[_id].update_result(boxes[0])
-                    trackers[_id].update_img(frame)
+                    for box in boxes:
+                        trackers[_id].update_result(box)
+                        trackers[_id].update_img(frame)
 
         #Generate next batch of imgs to be processed by workers
         process_list = []
@@ -643,16 +648,20 @@ def main():
             process_list.append((t.get_window_img(),t.get_id()))
         for data in process_list:
             input_queue.put(data)
+            print("Data of length {0} is put into input_queue".format(len(data[0])))
 
         #Generate boundingboxes to be drawn on this loop
-        boundingboxes = []
+        boundingboxes = np.ndarray((0,5))
         for t in trackers.values():
-            boundingboxes.append(t.get_result_bbox())
+            boundingboxes = np.concatenate((boundingboxes,np.array([t.get_result_bbox()])))
 
         #Show image
         img = frame.copy()
         img = drawBoxes(img, boundingboxes)
         cv2.imshow('img', img)
+        
+        for t in trackers.values():
+            cv2.imshow('tracker window', t.get_window_img())
 
         if cv2.waitKey(1) &0xFF == ord('q'):
             break
