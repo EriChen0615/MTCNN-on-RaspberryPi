@@ -16,6 +16,9 @@ def drawBoxes(im, boxes, color):
     print("draw box.")
     return im
 
+from timeit import default_timer as timer
+
+
 class Tracker:
     """
     INITIALIZATION:
@@ -41,6 +44,9 @@ class Tracker:
         self._update_window()
 
         self.img = None
+
+        self.last_time = timer()
+        self.fps = 0
 
     def _update_window(self):
         """
@@ -75,7 +81,7 @@ class Tracker:
         return result_bbox
 
     def __repr__(self):
-        return "Tracker id {0}\nTracker window:{1}".format(self._id,self.window)
+        return "Tracker id {0}\nTracker window:{1}\n Tracker fps:{2}".format(self._id,self.window,self.fps)
 
     def update_img(self,img):
         """
@@ -104,6 +110,11 @@ class Tracker:
 
         self.result_bbox = self._offset_bbox(boundingbox)
         self._update_window()
+
+        # update fps
+        self.fps = 1/(timer()-self.last_time)
+        self.last_time = timer()
+
         return self.result_bbox
 
     def get_id(self):
@@ -114,6 +125,9 @@ class Tracker:
 
     def get_result_bbox(self):
         return self.result_bbox
+
+    def get_fps(self):
+        return self.fps
 
 if __name__ == '__main__':
     img = np.zeros((320,240,3))
