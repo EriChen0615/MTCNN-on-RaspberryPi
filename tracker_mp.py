@@ -662,18 +662,18 @@ def main():
                                 trackers[_id].update_img(img_gray)
                             else:
                                 trackers[_id].update_img(frame)
+                            print(trackers[_id])
                         
         for t in trackers.values():
             if not gray:
                 t.update_img(frame)
             else:
                 t.update_img(img_gray)
-            print(t)
 
         #Generate next batch of imgs to be processed by workers
         process_list = []
         if search_complete:
-            print("search fps is {0}".format(1/timer()-last_time))
+            print("search fps is {0}".format(1/(timer()-last_time)))
             last_time = timer()
             if not gray:
                 process_list.append((frame,0))
