@@ -548,6 +548,7 @@ def detect_process(qin,qout):
     caffe_model_path = "./model"
 
     threshold = [0.6, 0.7, 0.7]
+    _threshold = [0.6, 0.7, 0.7]
     factor = 0.08
 
     caffe.set_mode_cpu()
@@ -578,7 +579,7 @@ def detect_process(qin,qout):
         if _id==0: # if full-size colour image
             boundingboxes, points = detect_face(img_matlab, minsize, PNet, RNet, ONet, threshold, False, factor)
         else:
-            boundingboxes, points = detect_face(img_matlab, 16, PNet, RNet, ONet, threshold, False, 0.6,fix_scale=True)
+            boundingboxes, points = detect_face(img_matlab, 16, PNet, RNet, ONet, _threshold, False, 0.6,fix_scale=True)
 
         qout.put((boundingboxes,_id))
         #toc()
@@ -662,6 +663,7 @@ def main():
             else:
                 if len(boxes)!=1: 
                     if _id in trackers.keys(): # to avoid invalid key
+                        cv2.destroyWindow("tracker id {0}".format(trackers[_id].get_id()))
                         del trackers[_id]
                 else:
                     if _id in trackers.keys():
@@ -707,7 +709,7 @@ def main():
         cv2.imshow('img', img)
         
         for t in trackers.values():
-            cv2.imshow('tracker window', t.get_window_img())
+            cv2.imshow('tracker id {0}'.format(t.get_id()), t.get_window_img())
 
         if cv2.waitKey(1) &0xFF == ord('q'):
             break
