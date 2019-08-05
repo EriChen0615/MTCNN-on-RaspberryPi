@@ -601,7 +601,11 @@ def main():
 
             _img = drawBoxes(_img,np.array([tracker.get_result_bbox()]))
             cv2.imshow('found_img',_img)
-
+        
+        cv2.waitKey(1)    
+        #if cv2.waitKey(1) & 0xFF == ord('q'):
+        #    break
+            
         #while(cv2.waitKey(0)!=27):
         #    pass
         sleep(0.01)
