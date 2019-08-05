@@ -220,6 +220,16 @@ def drawBoxes(im, boxes):
     for i in range(x1.shape[0]):
         cv2.rectangle(im, (int(x1[i]), int(y1[i])), (int(x2[i]), int(y2[i])), (0,255,0), 1)
     return im
+    
+def drawMarks(im, landmarks, boxes):
+    if boxes.shape[0]==0 or boxes.shape[1]==0:
+        return im
+    
+    for i in landmarks:
+            for j in range(5):
+                cv2.circle(im, (int(i[j]), int(i[j+5])), 1, (0, 255, 0),-1)
+    return im
+
 
 from time import time
 _tstart_stack = []
@@ -572,12 +582,26 @@ def detect_process(qin,qout):
             boundingboxes, points = detect_face(img_matlab, minsize, PNet, RNet, ONet, threshold, False, factor)
         else:
             boundingboxes, points = detect_face(img_matlab, 16, PNet, RNet, ONet, threshold, False, factor,fix_scale=True)
+        Boxes = {"box": boundingboxes, "marks": points}
 
-        qout.put((boundingboxes,_id))
+        qout.put((Boxes,_id))
         #toc()
 
 def iou(a,b):
-    return 1.0
+    w1 = a[2] - a[0] + 1
+    h1 = a[3] - a[1] + 1
+    w2 = b[2] - b[0] + 1
+    h2 = b[3] - b[1] + 1
+    xx1 = max(a[0], b[0])
+    yy1 = max(a[1], b[1])
+    xx2 = min(a[2], b[2])
+    yy2 = min(a[3], b[3])
+    w = max(0, xx2 - xx1 + 1)
+    h = max(0, yy2 - yy1 + 1)
+    
+    inter = w * h
+    union = w1 * h1 + w2 * h2 - inter
+    return inter / union
     #TODO
 
 def main():
@@ -616,28 +640,30 @@ def main():
         while not output_queue.empty():
             det_result.append(output_queue.get())
         for result in det_result:
-            print("result:",result[0])
+            print("result:",result[0]["box"])
             _id = result[1]
-            boxes = result[0]
+            boxes = result[0]["box"]
+            landmarks = result[0]["marks"]
             if _id==0:
                 search_complete = True
-                for box in boxes:
+                for i in range(np.shape(boxes)[0]):
                     spawn = True
                     for t in trackers.values():
-                        if iou(t.get_result_bbox(),box)>0.6:
+                        if iou(t.get_result_bbox(),boxes[i])>0.6:
                             spawn = False
                             break
                     if spawn:
-                        trackers[new_id] = Tracker(spawn_box=box,total_width=320,total_height=240,_id=new_id)
+                        trackers[new_id] = Tracker(spawn_box=boxes[i], marks = landmarks[i], total_width=320,total_height=240,_id=new_id)
                         trackers[new_id].update_img(frame)
                         new_id += 1
+                
             else:
                 if len(boxes)==0: 
                     pass
                     #del trackers[_id]
                 else:
-                    for box in boxes:
-                        trackers[_id].update_result(box)
+                    for i in range(np.shape(boxes)[0]):
+                        trackers[_id].update_result(boxes[i], landmarks[i])
                         trackers[_id].update_img(frame)
 
         #Generate next batch of imgs to be processed by workers
@@ -652,12 +678,15 @@ def main():
 
         #Generate boundingboxes to be drawn on this loop
         boundingboxes = np.ndarray((0,5))
+        landmarks = np.ndarray((0,10))
         for t in trackers.values():
             boundingboxes = np.concatenate((boundingboxes,np.array([t.get_result_bbox()])))
+            landmarks = np.concatenate((landmarks, np.array([t.get_landmarks()])))
 
         #Show image
         img = frame.copy()
         img = drawBoxes(img, boundingboxes)
+        img = drawMarks(img, landmarks, boundingboxes)
         cv2.imshow('img', img)
         
         for t in trackers.values():

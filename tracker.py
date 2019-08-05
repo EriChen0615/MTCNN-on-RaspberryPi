@@ -13,7 +13,7 @@ class Tracker:
         3. get_window_img()
         4. get_result_bbox()
     """
-    def __init__(self,spawn_box,total_width,total_height,_id,w_ratio=0.4,h_ratio=0.4):
+    def __init__(self,spawn_box, marks, total_width,total_height,_id,w_ratio=0.4,h_ratio=0.4):
         self._id = _id
         self.result_bbox = spawn_box # result_box [x1,y1,x2,y2,score]
         self.total_width = total_width
@@ -25,6 +25,8 @@ class Tracker:
         self._update_window()
 
         self.img = None
+        
+        self.marks = marks
 
     def _update_window(self):
         """
@@ -63,13 +65,14 @@ class Tracker:
         """
         self.img = img[int(self.window[1]):int(self.window[3]+1),int(self.window[0]):int(self.window[2]+1)]
 
-    def update_result(self,boundingbox):
+    def update_result(self,box,marks):
         """
         self.result_bbox is updated such that it can be shown correctly on the original image
         :param boundingbox:  The detection result of the cropped image.[x1,y1,x2,y2,score]
         :return:
         """
-        self.result_bbox = self._offset_bbox(boundingbox)
+        self.result_bbox = self._offset_bbox(box)
+        self.marks = marks
         self._update_window()
         return self.result_bbox
 
@@ -81,6 +84,9 @@ class Tracker:
 
     def get_result_bbox(self):
         return self.result_bbox
+
+    def get_landmarks(self):
+        return self.marks
 
 if __name__ == '__main__':
     img = np.random.rand(320,240,3)
