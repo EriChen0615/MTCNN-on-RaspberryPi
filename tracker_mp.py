@@ -256,7 +256,7 @@ def detect_face(img, minsize, PNet, RNet, ONet, threshold, fastresize, factor,fi
             scales.append(m * pow(factor, factor_count))
             minl *= factor
             factor_count += 1
-        scales = [0.128, 0.08, 0.148, 0.4, 0.1]
+        scales = [0.128, 0.08, 0.148, 0.4, 0.1,0.75]
     else:
         scales = []
         while minl >= 12:
@@ -650,7 +650,7 @@ def main():
                 for box in boxes:
                     spawn = True
                     for t in trackers.values():
-                        if IoU(t.get_result_bbox(),box)>0.6:
+                        if IoU(t.get_result_bbox(),box)>0.3:
                             spawn = False
                             break
                     if spawn:
